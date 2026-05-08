@@ -12,7 +12,6 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
-    <script src="https://cdn.jsdelivr.net/gh/Sea-Math/Sea-Math.github.io@main/bbno%24.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -344,16 +343,24 @@
                     <div class="dropdown">
                         <button class="model-selector-btn" id="model-toggle" onclick="toggleMenu('model-menu')">
                             <svg viewBox="0 0 24 24"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/><path d="M12 8V4"/><path d="M10 4h4"/></svg>
-                            <span id="current-model-name">Gemini 2.0 (Vision)</span>
+                            <span id="current-model-name">Gemini 2.5 Flash</span>
                         </button>
                         <div class="dropdown-menu" id="model-menu">
-                            <button class="dropdown-item" onclick="selectModel('Gemini 2.0 (Vision)')">
+                            <button class="dropdown-item" onclick="selectModel('Gemini 2.5 Flash')">
                                 <svg class="icon" viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
-                                Gemini 2.0 (Vision)
+                                Gemini 2.5 Flash
                             </button>
-                            <button class="dropdown-item" onclick="selectModel('Minimax M2.5')">
-                                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="4.93" y1="19.07" x2="19.07" y2="4.93"/></svg>
-                                Minimax M2.5
+                            <button class="dropdown-item" onclick="selectModel('Gemini 2.0 Flash')">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                                Gemini 2.0 Flash
+                            </button>
+                            <button class="dropdown-item" onclick="selectModel('GPT-4.1 Mini')">
+                                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                                GPT-4.1 Mini
+                            </button>
+                            <button class="dropdown-item" onclick="selectModel('DeepSeek V3')">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                DeepSeek V3
                             </button>
                         </div>
                     </div>
@@ -415,64 +422,33 @@
         <div id="viewer-content" class="viewer-content"></div>
     </div>
 
-    <div id="settings-modal" class="modal-overlay">
-        <div class="settings-modal">
-            <h3>API Configuration</h3>
-            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">Enter your OpenRouter API Key to start chatting.</p>
-            <input type="password" id="api-key-input" placeholder="sk-or-v1-...">
-            <div class="settings-modal-actions">
-                <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
-                <button class="btn-primary" onclick="saveSettings()">Save Configuration</button>
-            </div>
-        </div>
-    </div>
 
     <script>
         marked.use({ breaks: true });
-        
-        let API_KEY = localStorage.getItem('infinite_ai_key') || "";
-        if (!API_KEY) {
-            try {
-                if (typeof bbnoSecret !== 'undefined' && bbnoSecret.trim() !== "") {
-                    API_KEY = atob(bbnoSecret.trim());
-                    localStorage.setItem('infinite_ai_key', API_KEY);
-                }
-            } catch (e) {}
-        }
 
-        const MODEL_MAP = {
-            'Gemini 2.0 (Vision)': 'nvidia/nemotron-3-super-120b-a12b:free',
-            'Minimax M2.5': 'minimax/minimax-m2.5:free'
+        const GEMINI_KEY = "AIzaSyDQBARfLrOBmyZ5eeWcKwr6hg8uwr9mIBc";
+        const OPENROUTER_KEY = "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";
+
+        const MODELS = {
+            'Gemini 2.5 Flash': { provider: 'gemini', id: 'gemini-2.5-flash-preview-05-20' },
+            'Gemini 2.0 Flash': { provider: 'gemini', id: 'gemini-2.0-flash' },
+            'GPT-4.1 Mini': { provider: 'openrouter', id: 'openai/gpt-4.1-mini' },
+            'DeepSeek V3': { provider: 'openrouter', id: 'deepseek/deepseek-chat-v3-0324:free' },
         };
 
-        let currentUIModel = 'Gemini 2.0 (Vision)';
+        let currentUIModel = 'Gemini 2.5 Flash';
         let currentUIMode = 'Pro Mode';
         let isGenerating = false;
-        
+
         let chatContext = [];
         let chatHistoryHTML = "";
-        
+
         let fileData = null;
         let fileName = null;
         let fileType = null;
         let baseDataCache = null;
         const fileStorage = {};
         let fileIdCounter = 0;
-
-        function openSettings() {
-            document.getElementById('api-key-input').value = API_KEY;
-            document.getElementById('settings-modal').classList.add('show');
-        }
-        
-        function closeSettings() {
-            document.getElementById('settings-modal').classList.remove('show');
-        }
-
-        function saveSettings() {
-            API_KEY = document.getElementById('api-key-input').value.trim();
-            localStorage.setItem('infinite_ai_key', API_KEY);
-            closeSettings();
-        }
 
         function openRightPanel(codeContent, lang) {
             const panel = document.getElementById('right-panel');
@@ -704,9 +680,6 @@
         document.getElementById('viewer-modal').addEventListener('click', function(e) {
             if (e.target === this) closeViewer();
         });
-        document.getElementById('settings-modal').addEventListener('click', function(e) {
-            if (e.target === this) closeSettings();
-        });
 
         function downloadPDF(btn) {
             const content = btn.closest('.ai-message').querySelector('.ai-text');
@@ -801,13 +774,32 @@
             });
         }
 
+        async function callModelDirect(provider, modelId, messages) {
+            if (provider === 'gemini') {
+                const body = convertToGeminiFormat(messages);
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${GEMINI_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.candidates?.[0]?.content?.parts?.[0]?.text) return data.candidates[0].content.parts[0].text;
+                return "Gemini returned no response.";
+            } else {
+                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${OPENROUTER_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.origin, "X-Title": "Kraken AI" },
+                    body: JSON.stringify({ model: modelId, messages })
+                });
+                const data = await res.json();
+                if (data.choices?.[0]) return data.choices[0].message.content;
+                return "OpenRouter returned no response.";
+            }
+        }
+
         async function handleCodeBuilder() {
             if (isGenerating) return;
-            if (!API_KEY || API_KEY.trim() === "") {
-                openSettings();
-                return;
-            }
-            
+
             const inputField = document.getElementById("user-input");
             let messageText = inputField.value.trim();
             if (messageText === "" && !fileData) return;
@@ -835,73 +827,108 @@
             } else {
                 chatContext.unshift({ role: "system", content: getSystemPrompt() + " YOU ARE IN PEAK CODE BUILDER MODE." });
             }
-            
+
             chatContext.push({ role: "user", content: msgContent });
 
-            isGenerating = true; 
+            isGenerating = true;
             fileData = null; fileName = null; fileType = null; baseDataCache = null;
             inputField.placeholder = "Message Kraken AI...";
             document.getElementById('file-upload').value = '';
             checkInput();
-            
-            const aiMessageDiv = appendAIMessage('<div class="thinking-dots"><span></span><span></span><span></span></div>'); 
-            
+
+            const aiMessageDiv = appendAIMessage('<div class="thinking-dots"><span></span><span></span><span></span></div>');
+
             try {
-                const req1 = fetch("https://openrouter.ai/api/v1/chat/completions", {
-                    method: "POST", 
-                    headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.origin, "X-Title": "Kraken AI" },
-                    body: JSON.stringify({ model: 'google/gemini-2.0-pro-exp-02-05:free', messages: chatContext })
-                }).then(r => r.json());
+                const [res1, res2] = await Promise.allSettled([
+                    callModelDirect('gemini', 'gemini-2.5-flash-preview-05-20', chatContext),
+                    callModelDirect('openrouter', 'openai/gpt-4.1-mini', chatContext)
+                ]);
 
-                const req2 = fetch("https://openrouter.ai/api/v1/chat/completions", {
-                    method: "POST", 
-                    headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.origin, "X-Title": "Kraken AI" },
-                    body: JSON.stringify({ model: 'minimax/minimax-m2.5:free', messages: chatContext })
-                }).then(r => r.json());
+                const text1 = res1.status === 'fulfilled' ? res1.value : "Failed to load Gemini response.";
+                const text2 = res2.status === 'fulfilled' ? res2.value : "Failed to load GPT-4.1 Mini response.";
 
-                const [res1, res2] = await Promise.allSettled([req1, req2]);
-
-                let text1 = "Failed to load Gemini response.";
-                let text2 = "Failed to load Minimax response.";
-
-                if (res1.status === 'fulfilled' && res1.value.choices) {
-                    text1 = res1.value.choices[0].message.content;
-                }
-                
-                if (res2.status === 'fulfilled' && res2.value.choices) {
-                    text2 = res2.value.choices[0].message.content;
-                }
-
-                const combinedText = `# 🚀 Peak Code Builder Synthesis\n\n## 🧠 Gemini 2.0 Approach\n${text1}\n\n---\n\n## ⚡ Minimax M2.5 Approach\n${text2}`;
+                const combinedText = `# Peak Code Builder\n\n## Gemini 2.5 Flash\n${text1}\n\n---\n\n## GPT-4.1 Mini\n${text2}`;
 
                 const textContainer = aiMessageDiv.querySelector('.ai-text');
                 renderAIMessageContent(textContainer, combinedText);
                 chatContext.push({ role: "assistant", content: combinedText });
 
-            } catch (err) { 
-                aiMessageDiv.querySelector('.ai-text').innerText = "Peak Code Builder execution failed."; 
+            } catch (err) {
+                aiMessageDiv.querySelector('.ai-text').innerText = "Peak Code Builder failed: " + err.message;
                 chatContext.pop();
             } finally {
-                isGenerating = false; 
+                isGenerating = false;
                 inputField.focus();
                 checkInput();
                 saveChatData();
             }
         }
 
+        function convertToGeminiFormat(messages) {
+            let systemText = '';
+            const contents = [];
+            for (const msg of messages) {
+                if (msg.role === 'system') {
+                    systemText = typeof msg.content === 'string' ? msg.content : msg.content[0].text;
+                    continue;
+                }
+                const role = msg.role === 'assistant' ? 'model' : 'user';
+                const parts = [];
+                if (Array.isArray(msg.content)) {
+                    for (const part of msg.content) {
+                        if (part.type === 'text') parts.push({ text: part.text });
+                        else if (part.type === 'image_url') {
+                            const dataUrl = part.image_url.url;
+                            const match = dataUrl.match(/^data:(.*?);base64,(.*)$/);
+                            if (match) parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                        }
+                    }
+                } else {
+                    parts.push({ text: msg.content });
+                }
+                contents.push({ role, parts });
+            }
+            const body = { contents };
+            if (systemText) body.systemInstruction = { parts: [{ text: systemText }] };
+            return body;
+        }
+
+        async function callModel(messages) {
+            const modelConfig = MODELS[currentUIModel];
+            if (modelConfig.provider === 'gemini') {
+                const body = convertToGeminiFormat(messages);
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateContent?key=${GEMINI_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error.message);
+                if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+                    return data.candidates[0].content.parts[0].text;
+                }
+                throw new Error("No response from Gemini: " + JSON.stringify(data));
+            } else {
+                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${OPENROUTER_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.origin, "X-Title": "Kraken AI" },
+                    body: JSON.stringify({ model: modelConfig.id, messages })
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error.message);
+                if (data.choices && data.choices[0]) return data.choices[0].message.content;
+                throw new Error("No response from OpenRouter: " + JSON.stringify(data));
+            }
+        }
+
         async function handleSend(isRedo = false) {
             if (isGenerating) return;
-            if (!API_KEY || API_KEY.trim() === "") {
-                openSettings();
-                return;
-            }
-            
+
             const inputField = document.getElementById("user-input");
             let messageText = inputField.value.trim();
-            const targetModelID = MODEL_MAP[currentUIModel];
-            
+
             if (isRedo && chatContext.length >= 2) {
-                chatContext.pop(); 
+                chatContext.pop();
                 if(chatContext.length > 1) {
                     const lastUser = chatContext[chatContext.length - 1];
                     messageText = Array.isArray(lastUser.content) ? lastUser.content[0].text : lastUser.content;
@@ -910,10 +937,10 @@
                 if (messageText === "" && !fileData) return;
                 const welcome = document.getElementById("welcome-msg");
                 if (welcome) welcome.remove();
-                
+
                 appendUserMessage(messageText, fileName, fileData, fileType, baseDataCache);
                 inputField.value = ""; inputField.style.height = 'auto';
-                
+
                 let msgContent = messageText;
                 if(fileData) {
                     if (fileType === 'image' && baseDataCache) {
@@ -925,47 +952,31 @@
                         msgContent = messageText + (messageText ? `\n\n` : ``) + `--- Attached File (${fileName}) ---\n${fileData}\n--- End File ---`;
                     }
                 }
-                
+
                 if(chatContext.length > 0 && chatContext[0].role === 'system') {
                     chatContext[0].content = getSystemPrompt();
                 }
                 chatContext.push({ role: "user", content: msgContent });
             }
 
-            isGenerating = true; 
+            isGenerating = true;
             fileData = null; fileName = null; fileType = null; baseDataCache = null;
             inputField.placeholder = "Message Kraken AI...";
             document.getElementById('file-upload').value = '';
             checkInput();
-            
-            const aiMessageDiv = appendAIMessage('<div class="thinking-dots"><span></span><span></span><span></span></div>'); 
-            
+
+            const aiMessageDiv = appendAIMessage('<div class="thinking-dots"><span></span><span></span><span></span></div>');
+
             try {
-                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                    method: "POST", 
-                    headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.origin, "X-Title": "Kraken AI" },
-                    body: JSON.stringify({ model: targetModelID, messages: chatContext })
-                });
-                
-                const data = await res.json();
+                const rawText = await callModel(chatContext);
                 const textContainer = aiMessageDiv.querySelector('.ai-text');
-                
-                if (data.error && data.error.message) {
-                     textContainer.innerText = `API Error: ${data.error.message}`;
-                     chatContext.pop();
-                } else if (data.choices && data.choices.length > 0) {
-                    let rawText = data.choices[0].message.content;
-                    renderAIMessageContent(textContainer, rawText);
-                    chatContext.push({ role: "assistant", content: rawText });
-                } else {
-                    textContainer.innerText = `Error: ${JSON.stringify(data)}`;
-                    chatContext.pop(); 
-                }
-            } catch (err) { 
-                aiMessageDiv.querySelector('.ai-text').innerText = "Network transmission failed. Please check your internet connection."; 
+                renderAIMessageContent(textContainer, rawText);
+                chatContext.push({ role: "assistant", content: rawText });
+            } catch (err) {
+                aiMessageDiv.querySelector('.ai-text').innerText = "Error: " + err.message;
                 chatContext.pop();
             } finally {
-                isGenerating = false; 
+                isGenerating = false;
                 inputField.focus();
                 checkInput();
                 saveChatData();

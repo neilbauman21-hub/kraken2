@@ -53,12 +53,10 @@ cat > "${APP_DIR}/server.js" << 'SERVEREOF'
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { createBareServer } = require("@tomphttp/bare-server-node");
+const { routeRequest } = require("wisp-server-node");
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const STATIC_DIR = __dirname;
-
-const bare = createBareServer("/bare/");
 
 const MIME_TYPES = {
     ".html": "text/html",
@@ -79,18 +77,17 @@ const MIME_TYPES = {
     ".mp4": "video/mp4",
     ".webm": "video/webm",
     ".mp3": "audio/mpeg",
+    ".map": "application/json",
 };
 
 function serveStatic(req, res) {
     let urlPath = new URL(req.url, `http://localhost:${PORT}`).pathname;
 
-    // Default to index.html
     if (urlPath === "/") urlPath = "/index.html";
 
     const filePath = path.join(STATIC_DIR, urlPath);
     const safePath = path.resolve(filePath);
 
-    // Prevent directory traversal
     if (!safePath.startsWith(path.resolve(STATIC_DIR))) {
         res.writeHead(403);
         res.end("Forbidden");
@@ -99,7 +96,6 @@ function serveStatic(req, res) {
 
     fs.stat(safePath, (err, stats) => {
         if (err || !stats.isFile()) {
-            // Try with .html extension
             const htmlPath = safePath + ".html";
             fs.stat(htmlPath, (err2, stats2) => {
                 if (err2 || !stats2.isFile()) {
@@ -122,26 +118,19 @@ function streamFile(filePath, res) {
     res.writeHead(200, {
         "Content-Type": mime,
         "Cache-Control": "public, max-age=3600",
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Embedder-Policy": "require-corp",
     });
 
     fs.createReadStream(filePath).pipe(res);
 }
 
 const server = http.createServer((req, res) => {
-    // Handle bare server requests
-    if (bare.shouldRoute(req)) {
-        bare.routeRequest(req, res);
-        return;
-    }
-
     serveStatic(req, res);
 });
 
+// Wisp server handles WebSocket upgrades at /wisp/
 server.on("upgrade", (req, socket, head) => {
-    if (bare.shouldRoute(req)) {
-        bare.routeUpgrade(req, socket, head);
+    if (req.url.startsWith("/wisp/")) {
+        routeRequest(req, socket, head);
     } else {
         socket.end();
     }
@@ -149,6 +138,7 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`Kraken Network running on http://0.0.0.0:${PORT}`);
+    console.log(`Wisp server at ws://0.0.0.0:${PORT}/wisp/`);
 });
 SERVEREOF
 
@@ -165,7 +155,7 @@ cat > "${APP_DIR}/package.json" << 'PKGEOF'
         "start": "node server.js"
     },
     "dependencies": {
-        "@tomphttp/bare-server-node": "^2.0.4"
+        "wisp-server-node": "^1.1.0"
     }
 }
 PKGEOF

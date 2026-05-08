@@ -1,8 +1,8 @@
 // =====================================================
 // CONFIGURATION
 // =====================================================
-const DEFAULT_WISP = window.SITE_CONFIG?.defaultWisp ?? "wss://bot-host--ajbrnatbbb.replit.app/wisp/";
-const WISP_SERVERS = [{ name: "Default Wisp", url: "wss://bot-host--ajbrnatbbb.replit.app/wisp/" }];
+const DEFAULT_WISP = window.SITE_CONFIG?.defaultWisp ?? `wss://${location.host}/wisp/`;
+const WISP_SERVERS = [{ name: "Local Server", url: `wss://${location.host}/wisp/` }];
 
 if (!localStorage.getItem("proxServer")) {
     localStorage.setItem("proxServer", DEFAULT_WISP);
@@ -78,10 +78,11 @@ const notify = (type, title, message) => { if (typeof Notify !== 'undefined') No
 // =====================================================
 // INITIALIZATION (With Auto-Nuke for Corruption)
 // =====================================================
+let scramjetRetries = 0;
 async function getSharedScramjet() {
     if (sharedScramjet) return sharedScramjet;
     const { ScramjetController } = $scramjetLoadController();
-    
+
     sharedScramjet = new ScramjetController({
         prefix: getBasePath() + "scramjet/",
         files: {
@@ -90,16 +91,21 @@ async function getSharedScramjet() {
             sync: "https://cdn.jsdelivr.net/gh/Destroyed12121/Staticsj@main/JS/scramjet.sync.js"
         }
     });
-    
+
     try {
         await sharedScramjet.init();
     } catch (err) {
-        console.warn('Scramjet cache corrupted. Auto-nuking IndexedDB...', err);
-        try {
-            ['scramjet-data', 'scrambase', 'ScramjetData'].forEach(db => indexedDB.deleteDatabase(db));
-        } catch (e) {}
-        sharedScramjet = null;
-        return getSharedScramjet(); // Retry after nuke
+        console.warn('Scramjet init failed:', err);
+        if (scramjetRetries < 2) {
+            scramjetRetries++;
+            try {
+                ['scramjet-data', 'scrambase', 'ScramjetData'].forEach(db => indexedDB.deleteDatabase(db));
+            } catch (e) {}
+            sharedScramjet = null;
+            await new Promise(r => setTimeout(r, 500));
+            return getSharedScramjet();
+        }
+        console.error('Scramjet init failed after retries. Proxy may not work.');
     }
     return sharedScramjet;
 }
@@ -482,13 +488,12 @@ function toggleDevTools() {
 document.addEventListener('DOMContentLoaded', async function () {
     try {
         await initializeWithBestServer();
-        await getSharedScramjet();
-        await getSharedConnection();
 
+        // Register SW FIRST so scramjet.init() can find the controller
         if ('serviceWorker' in navigator) {
             const reg = await navigator.serviceWorker.register(getBasePath() + 'sw.js', { scope: getBasePath() });
             await navigator.serviceWorker.ready;
-            
+
             const swConfig = {
                 type: "config",
                 wispurl: localStorage.getItem("proxServer") ?? DEFAULT_WISP,
@@ -501,8 +506,11 @@ document.addEventListener('DOMContentLoaded', async function () {
                 if (sw) sw.postMessage(swConfig);
             };
             sendConfig();
-            setTimeout(sendConfig, 1000); // Failsafe SW ping
+            setTimeout(sendConfig, 1000);
         }
+
+        await getSharedScramjet();
+        await getSharedConnection();
         await initializeBrowser();
     } catch (err) {
         console.error("Initialization error:", err);
