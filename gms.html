@@ -1,0 +1,583 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kraken Network</title>
+    
+    <script src="bbno$.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        
+        :root {
+            --bg-outer: #050a14;
+            --bg-panel: #0a1020;
+            --bg-card: #0c1524;
+            --border-color: #1a2744;
+            --accent-cyan: #3b82f6; 
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            --text-main: #ffffff;
+            --text-sub: #c8d6e5;
+            --text-muted: #6b7fa3;
+            --btn-bg: #0c1524;
+            --btn-hover: #152238;
+            --tag-bg: #0c1524;
+            --badge-bg: #152238;
+            --badge-text: #60a5fa;
+        }
+
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; cursor: none !important; }
+        iframe { cursor: auto !important; }
+        
+        body { background-color: var(--bg-outer); color: var(--text-main); height: 100vh; width: 100vw; display: flex; overflow: hidden; position: relative; }
+
+        
+        #custom-v-cursor {
+            position: fixed;
+            top: 0; left: 0;
+            width: 32px; height: 32px;
+            z-index: 2147483647; 
+            pointer-events: none;
+            
+            will-change: transform;
+            opacity: 0; 
+            transition: opacity 0.1s ease-out;
+            
+        }
+
+       
+        .panel-container { width: 100%; height: 100vh; display: flex; }
+        .main-panel { flex-grow: 1; background-color: transparent; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        
+        .content-scroll { position: relative; z-index: 10; width: 100%; height: 100%; overflow-y: auto; padding: 80px 40px 100px 40px; display: flex; flex-direction: column; align-items: center; }
+        .content-scroll::-webkit-scrollbar { width: 8px; }
+        .content-scroll::-webkit-scrollbar-track { background: transparent; }
+        .content-scroll::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
+
+        .top-bar-actions { position: absolute; top: 30px; right: 40px; z-index: 50; display: flex; gap: 15px; }
+        .action-btn { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-sub); width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.3s ease; }
+        .action-btn:hover { color: var(--accent-cyan); border-color: var(--accent-cyan); box-shadow: 0 0 15px var(--accent-glow); }
+
+        .header-titles { text-align: center; margin-bottom: 20px; }
+        .main-title { font-size: 4.5rem; font-weight: 800; color: #ffffff; letter-spacing: 2px; margin-bottom: 5px; text-transform: uppercase; }
+        .subtitle { color: var(--text-sub); font-size: 1.1rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+        .search-wrapper { width: 100%; max-width: 500px; margin: 0 auto 40px auto; position: relative; z-index: 101; }
+        .inputcontainer { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 14px 20px; display: flex; align-items: center; transition: all 0.3s ease; border-radius: 12px; }
+        .inputcontainer:focus-within { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.05); }
+        .inputcontainer input { background: none; border: none; outline: none; color: var(--text-main); font-size: 1.1rem; width: 100%; text-align: center; font-style: italic; }
+        .inputcontainer input:focus { text-align: left; font-style: normal; }
+        .inputcontainer input::placeholder { color: var(--text-muted); }
+
+        .combined-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 25px; width: 100%; max-width: 1400px; margin: 0 auto; }
+        
+        .zone-item { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; position: relative; aspect-ratio: 1; transition: transform 0.2s ease, border-color 0.2s ease; }
+        .zone-item:hover { transform: scale(1.05); border-color: var(--accent-cyan); box-shadow: 0 10px 25px rgba(255,255,255,0.05); }
+        .zone-item img { width: 100%; height: 100%; object-fit: cover; transition: opacity 0.2s; }
+        
+        .source-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.85); color: var(--accent-cyan); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; z-index: 5; pointer-events: none; }
+        .zone-name { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.95)); color: white; padding: 30px 15px 15px 15px; font-size: 1rem; font-weight: 800; text-align: center; opacity: 1; transition: opacity 0.2s; z-index: 5; pointer-events: none; }
+        
+        .hover-stats { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(3px); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; opacity: 0; transition: opacity 0.2s; z-index: 10; pointer-events: none; }
+        .zone-item:hover .hover-stats { opacity: 1; }
+        .zone-item:hover .zone-name { opacity: 0; }
+        .stat-row { display: flex; align-items: center; gap: 10px; font-size: 1.1rem; font-weight: 800; }
+        .stat-row i.fa-eye, .stat-row i.fa-thumbs-up { color: #ffffff; }
+        .stat-row i.fa-thumbs-down { color: #666666; }
+
+        
+        #zoneViewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-outer); z-index: 2000; display: none; overflow-y: auto; }
+        #zoneViewer::-webkit-scrollbar { width: 8px; }
+        #zoneViewer::-webkit-scrollbar-track { background: transparent; }
+        #zoneViewer::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        
+        .game-page-container { max-width: 1500px; margin: 0 auto; padding: 20px 40px; }
+        .back-nav { margin-bottom: 20px; }
+        .back-nav button { background: var(--btn-bg); border: 1px solid var(--border-color); color: white; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 10px; transition: 0.2s; cursor: none !important; }
+        .back-nav button:hover { background: var(--btn-hover); border-color: var(--text-muted); }
+
+        .game-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
+        .game-col-side { display: flex; flex-direction: column; gap: 20px; }
+        .suggested-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .suggested-item { aspect-ratio: 1; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); transition: 0.2s; }
+        .suggested-item:hover { border-color: var(--accent-cyan); transform: scale(1.02); }
+        .suggested-item img { width: 100%; height: 100%; object-fit: cover; }
+        .ai-loading-status { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-sub); padding: 15px; border-radius: 8px; text-align: center; font-size: 0.85rem; font-weight: 600; display: none; }
+
+        .game-col-main { display: flex; flex-direction: column; gap: 15px; }
+        .iframe-container { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px 12px 0 0; overflow: hidden; border: 1px solid var(--border-color); border-bottom: none; cursor: auto; }
+        #zoneFrame { width: 100%; height: 100%; border: none; }
+        .game-toolbar { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 0 0 12px 12px; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .toolbar-left { display: flex; align-items: center; gap: 12px; }
+        .toolbar-icon { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border-color); }
+        .toolbar-title { display: flex; flex-direction: column; }
+        .toolbar-title span:first-child { font-weight: 800; font-size: 1.1rem; }
+        .toolbar-title span:last-child { font-size: 0.75rem; color: var(--text-muted); }
+        .toolbar-center { flex-grow: 1; max-width: 400px; margin: 0 20px; }
+        .fake-url-bar { background: var(--bg-outer); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 15px; color: var(--text-muted); font-size: 0.8rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        .toolbar-right { display: flex; gap: 8px; }
+        .toolbar-btn { background: var(--btn-bg); border: 1px solid var(--border-color); color: var(--text-sub); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: 0.2s; font-size: 1rem; cursor: none !important;}
+        .toolbar-btn.wide { width: auto; padding: 0 15px; gap: 8px; font-weight: 600; font-size: 0.9rem;}
+        .toolbar-btn:hover { background: var(--btn-hover); color: var(--accent-cyan); border-color: var(--text-sub); }
+        .toolbar-btn:disabled { opacity: 0.5; }
+
+        .game-meta-header { margin-top: 10px; }
+        .game-meta-title { display: flex; align-items: center; gap: 15px; margin-bottom: 12px; }
+        .game-meta-title h1 { font-size: 2.2rem; font-weight: 900; letter-spacing: -0.5px; }
+        .badge { background: var(--badge-bg); color: var(--badge-text); border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        .fire-stats { font-size: 0.85rem; color: var(--text-sub); font-weight: 800; margin-left: 10px; }
+        .tags-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tag { background: var(--tag-bg); color: var(--text-sub); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .info-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; }
+        .info-card.full-width { grid-column: 1 / -1; }
+        .info-card h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 15px; color: white; display: flex; align-items: center; gap: 10px; }
+        .info-card p, .info-card ul { color: var(--text-sub); font-size: 0.95rem; line-height: 1.6; }
+        .info-card ul { margin-left: 20px; }
+        .ai-sparkle { color: var(--text-main); font-size: 1.1rem; }
+
+        
+        .working-toast {
+            position: fixed; bottom: -100px; right: 30px; background: var(--bg-card); border: 1px solid var(--border-color);
+            padding: 20px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 3000;
+            display: flex; flex-direction: column; gap: 15px; transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .working-toast.show { bottom: 30px; }
+        .working-toast p { font-weight: 800; font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 10px; }
+        .toast-btns { display: flex; gap: 10px; }
+        .toast-btn { flex: 1; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-main); padding: 8px 0; border-radius: 6px; font-weight: 800; transition: 0.2s; cursor: none !important;}
+        .toast-btn:hover { background: var(--btn-hover); border-color: var(--text-sub); }
+
+        #infoModal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 3000; display: none; justify-content: center; align-items: center; }
+        .modal-content { background: var(--bg-panel); border: 1px solid var(--border-color); padding: 40px; border-radius: 20px; width: 90%; max-width: 500px; position: relative; }
+        .modal-close { position: absolute; top: 20px; right: 20px; background: none; border: none; color: var(--text-sub); font-size: 1.5rem; }
+        .modal-title { font-size: 2rem; font-weight: 900; margin-bottom: 20px; text-transform: uppercase; }
+
+        .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; grid-column: 1 / -1; padding: 40px; }
+        .spinner { width: 40px; height: 40px; border: 4px solid var(--border-color); border-left-color: var(--accent-cyan); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { color: var(--text-sub); font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+
+    <svg id="custom-v-cursor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2 L22 22 L12 18 L2 22 Z" fill="#3b82f6" />
+    </svg>
+
+    <div class="panel-container">
+        <main class="main-panel">
+            <div class="top-bar-actions">
+                <button class="action-btn" onclick="openSiteInAboutBlank()" title="Open Hub in about:blank"><i class="fa-solid fa-up-right-from-square"></i></button>
+                <button class="action-btn" onclick="document.getElementById('infoModal').style.display='flex'" title="System Info"><i class="fa-solid fa-circle-info"></i></button>
+            </div>
+            <div class="content-scroll">
+                <div class="header-titles">
+                    <h1 class="main-title">Kraken Games</h1>
+                    <p class="subtitle" id="gameCount">Loading libraries...</p>
+                </div>
+                <div class="search-wrapper">
+                    <div class="inputcontainer">
+                        <input type="text" id="dumbSearchInput" placeholder="Search games..." autocomplete="off">
+                    </div>
+                </div>
+                <div id="zonesWrapper" class="combined-grid">
+                    <div class="loading-container">
+                        <div class="spinner"></div>
+                        <p class="loading-text">Fetching data...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="zoneViewer">
+        <div class="game-page-container">
+            <div class="back-nav">
+                <button onclick="closeZone()"><i class="fa-solid fa-chevron-left"></i> Back to Games</button>
+            </div>
+
+            <div class="game-layout">
+                <div class="game-col-side">
+                    <div class="ai-loading-status" id="aiStatus"><i class="fa-solid fa-microchip fa-spin"></i> Processing data...</div>
+                    <h3 style="color:white; font-size:1.1rem; font-weight:800;">Suggested</h3>
+                    <div class="suggested-grid" id="sidebarGrid"></div>
+                </div>
+
+                <div class="game-col-main">
+                    <div>
+                        <div class="iframe-container" id="gameBoundary">
+                            <iframe id="zoneFrame" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"></iframe>
+                        </div>
+                        <div class="game-toolbar">
+                            <div class="toolbar-left">
+                                <img src="" id="toolbarIcon" class="toolbar-icon" alt="icon">
+                                <div class="toolbar-title">
+                                    <span id="zoneName">Game Name</span>
+                                    <span id="zoneAuthor">Author Network</span>
+                                </div>
+                            </div>
+                            <div class="toolbar-center">
+                                <div class="fake-url-bar" id="fakeUrl">...</div>
+                            </div>
+                            <div class="toolbar-right">
+                                <button class="toolbar-btn wide" id="likeBtn" onclick="incrementGameStat('likes')"><i class="fa-regular fa-thumbs-up"></i> <span id="likesCount">...</span></button>
+                                <button class="toolbar-btn wide" id="dislikeBtn" onclick="incrementGameStat('dislikes')"><i class="fa-regular fa-thumbs-down"></i> <span id="dislikesCount">...</span></button>
+                                <button class="toolbar-btn" onclick="openGameInAboutBlank()" title="Open Game in about:blank"><i class="fa-solid fa-up-right-from-square"></i></button>
+                                <button class="toolbar-btn" onclick="reloadFrame()" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button>
+                                <button class="toolbar-btn" onclick="fullscreenZone()" title="Fullscreen"><i class="fa-solid fa-expand"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="game-meta-header">
+                        <div class="game-meta-title">
+                            <h1 id="pageGameTitle">Loading...</h1>
+                            <span class="badge" id="pageGameBadge">...</span>
+                            <span class="fire-stats"><i class="fa-solid fa-eye"></i> <span id="playsCount">0</span> Views</span>
+                        </div>
+                        <div class="tags-container" id="pageTags"></div>
+                    </div>
+
+                    <div class="info-grid">
+                        <div class="info-card full-width">
+                            <h3><i class="fa-solid fa-circle-info ai-sparkle"></i> About This Game</h3>
+                            <p id="aiDescription">Loading description...</p>
+                        </div>
+                        <div class="info-card">
+                            <h3><i class="fa-solid fa-robot ai-sparkle"></i> Notes & Tips</h3>
+                            <ul id="aiNotes"><li>Loading...</li></ul>
+                        </div>
+                        <div class="info-card">
+                            <h3>Controls</h3>
+                            <p>Typically played with Arrow Keys / WASD and the Mouse for menus. Follow on-screen instructions if available.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="workingToast" class="working-toast">
+        <p><i class="fa-solid fa-triangle-exclamation" style="color: #ffffff;"></i> Does this game work?</p>
+        <div class="toast-btns">
+            <button class="toast-btn" onclick="handleGameReport(false)">Yes</button>
+            <button class="toast-btn" onclick="handleGameReport(true)">No</button>
+        </div>
+    </div>
+
+    <div id="infoModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="document.getElementById('infoModal').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="modal-title">System Info</h3>
+            <div class="info-card"><h4>Site Maker</h4><p>Kraken Network Team</p></div>
+            <div class="info-card"><h4>Games & Engine Source</h4><p>Open Source Contributors</p></div>
+        </div>
+    </div>
+
+    <script>
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyCpQ0VzuKLgi5uWHqi0oqCm3acAxqwu56k",
+            authDomain: "estdryfgihojkl.firebaseapp.com",
+            projectId: "estdryfgihojkl",
+            storageBucket: "estdryfgihojkl.firebasestorage.app",
+            messagingSenderId: "655218285663",
+            appId: "1:655218285663:web:9423da27bf31474c38cfea",
+            measurementId: "G-9P0PJF7NVQ"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        
+        let API_KEY = "";
+        try { if (typeof bbnoSecret !== 'undefined' && bbnoSecret.trim() !== "") API_KEY = atob(bbnoSecret.trim()); } catch (e) {}
+        const MODEL_ID = 'nvidia/nemotron-3-nano-30b-a3b:free';
+
+        
+        const zoneViewer = document.getElementById('zoneViewer');
+        const zoneFrame = document.getElementById('zoneFrame');
+        const searchInput = document.getElementById('dumbSearchInput');
+        const zonesWrapper = document.getElementById('zonesWrapper');
+        const gameCountText = document.getElementById('gameCount');
+        let toastTimeout;
+        
+        let allZones = [];
+        let firebaseStats = {};
+        let currentBlobUrl = null;
+        let activeGameName = null;
+
+        const sources = [
+            { name: "GN Math Zone", type: "json", json: "https://cdn.jsdelivr.net/gh/freebuisness/assets@main/zones.json", cover: "https://cdn.jsdelivr.net/gh/freebuisness/covers@main", html: "https://cdn.jsdelivr.net/gh/freebuisness/html@main" },
+            { name: "Sea Bean", type: "json", json: "https://cdn.jsdelivr.net/gh/sea-bean-unblocked/sde@main/zzz.json", cover: "https://cdn.jsdelivr.net/gh/sea-bean-unblocked/Singlemile@main/Icon/", html: "https://cdn.jsdelivr.net/gh/sea-bean-unblocked/Singlemile@main/games/" },
+            { name: "Master Archive", type: "combined", repos: ["sea-bean-unblocked/Folder-1", "sea-bean-unblocked/Folder-2", "sea-bean-unblocked/Folder-3"], icon: "https://sea-math-official.neocities.org/Perfet.png" }
+        ];
+
+        
+        async function fetchAllFirebaseStats() {
+            try {
+                const snapshot = await db.collection('games').get();
+                snapshot.forEach(doc => { firebaseStats[doc.id] = doc.data(); });
+            } catch (error) { console.error("Error fetching Firebase stats.", error); }
+        }
+
+        function sortGamesByPopularity(gamesArray) {
+            const processedGames = gamesArray.map(game => {
+                const safeId = game.name.replace(/[^a-zA-Z0-9]/g, ''); 
+                const stats = firebaseStats[safeId] || { plays: 0, likes: 0, dislikes: 0, reports: 0 };
+                const score = (stats.likes * 10) + (stats.plays * 1) - (stats.dislikes * 5) - (stats.reports * 20);
+                return { ...game, dbId: safeId, plays: stats.plays, likes: stats.likes, dislikes: stats.dislikes, reports: stats.reports, score: score };
+            });
+            const validGames = processedGames.filter(game => game.reports < 5);
+            return validGames.sort((a, b) => b.score - a.score);
+        }
+
+        async function incrementGameStat(statType) {
+            if (!activeGameName) return;
+            const safeId = activeGameName.replace(/[^a-zA-Z0-9]/g, '');
+            const gameRef = db.collection('games').doc(safeId);
+
+            if(statType === 'likes') { document.getElementById('likesCount').innerText = parseInt(document.getElementById('likesCount').innerText) + 1; document.getElementById('likeBtn').disabled = true; document.getElementById('dislikeBtn').disabled = true; } 
+            else if (statType === 'dislikes') { document.getElementById('dislikesCount').innerText = parseInt(document.getElementById('dislikesCount').innerText) + 1; document.getElementById('likeBtn').disabled = true; document.getElementById('dislikeBtn').disabled = true; }
+
+            try {
+                const docSnap = await gameRef.get();
+                if (!docSnap.exists) {
+                    await gameRef.set({ plays: statType === 'plays'?1:0, likes: statType === 'likes'?1:0, dislikes: statType === 'dislikes'?1:0, reports: statType === 'reports'?1:0 });
+                } else {
+                    await gameRef.update({ [statType]: firebase.firestore.FieldValue.increment(1) });
+                }
+            } catch (error) {}
+        }
+
+        function handleGameReport(isBroken) {
+            const toast = document.getElementById('workingToast');
+            if (isBroken) incrementGameStat('reports'); 
+            toast.classList.remove('show');
+        }
+
+        
+        async function loadAllSources() {
+            let newZones = []; 
+            const fetchPromises = sources.map(async (source) => {
+                let sourceData = [];
+                try {
+                    if (source.type === 'json') {
+                        const res = await fetch(source.json + "?t=" + Date.now());
+                        const data = await res.json();
+                        sourceData = data.map(item => ({ ...item, sourceName: source.name, resolvedCover: item.cover ? item.cover.replace("{COVER_URL}", source.cover).replace("{HTML_URL}", source.html) : (source.icon || ''), resolvedUrl: item.url ? item.url.replace("{HTML_URL}", source.html) : '' }));
+                    } else if (source.type === 'combined') {
+                        for (const repo of source.repos) {
+                            try {
+                                const res = await fetch(`https://api.github.com/repos/${repo}/contents/`);
+                                if (res.ok) {
+                                    const files = await res.json();
+                                    files.forEach(file => { if (file.type === 'dir' || file.name.endsWith('.html')) sourceData.push({ name: file.name.replace('.html', ''), id: file.sha, author: repo, sourceName: source.name, resolvedCover: source.icon, resolvedUrl: `https://cdn.jsdelivr.net/gh/${repo}@main/${file.name}${file.type === 'dir' ? '/index.html' : ''}` }); });
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                } catch (error) {}
+                return sourceData;
+            });
+
+            const results = await Promise.all(fetchPromises);
+            results.forEach(data => newZones = newZones.concat(data));
+            
+            const uniqueZones = []; const seen = new Set();
+            for (const item of newZones) {
+                const key = item.name + item.resolvedUrl;
+                if (!seen.has(key)) { seen.add(key); uniqueZones.push(item); }
+            }
+
+            await fetchAllFirebaseStats();
+            allZones = sortGamesByPopularity(uniqueZones);
+            if (searchInput.value.trim() === '') updateCountAndRender(allZones); else handlePeakSearch();
+        }
+
+        function updateCountAndRender(gamesToRender) {
+            gameCountText.textContent = `Showing ${gamesToRender.length} games`;
+            zonesWrapper.innerHTML = '';
+            if (gamesToRender.length === 0) { zonesWrapper.innerHTML = '<p class="loading-text">No games found.</p>'; return; }
+
+            const fragment = document.createDocumentFragment();
+            gamesToRender.forEach(file => {
+                const item = document.createElement("div"); item.className = "zone-item";
+                item.innerHTML = `
+                    <div class="source-tag">${file.sourceName}</div>
+                    <img src="${file.resolvedCover}" loading="lazy" onerror="this.src='https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(file.name)}'">
+                    <div class="zone-name">${file.name}</div>
+                    <div class="hover-stats">
+                        <div class="stat-row"><i class="fa-solid fa-eye"></i> ${file.plays || 0}</div>
+                        <div class="stat-row"><i class="fa-solid fa-thumbs-up"></i> ${file.likes || 0}</div>
+                        <div class="stat-row"><i class="fa-solid fa-thumbs-down"></i> ${file.dislikes || 0}</div>
+                    </div>
+                `;
+                item.onclick = (e) => { e.preventDefault(); openZone(file); };
+                fragment.appendChild(item);
+            });
+            zonesWrapper.appendChild(fragment);
+        }
+
+        function handlePeakSearch() {
+            const query = searchInput.value.toLowerCase().trim();
+            if (query === '') { updateCountAndRender(allZones); return; }
+            const searchTokens = query.split(/\s+/);
+            const results = allZones.filter(z => { return searchTokens.every(token => `${z.name} ${z.author || ''} ${z.sourceName || ''}`.toLowerCase().includes(token)); });
+            updateCountAndRender(results);
+        }
+        searchInput.addEventListener('input', () => { clearTimeout(window.searchTimeout); window.searchTimeout = setTimeout(handlePeakSearch, 150); });
+
+        
+        function populateSidebar() {
+            const grid = document.getElementById('sidebarGrid'); grid.innerHTML = '';
+            let selected = allZones.slice(0, 6);
+            selected.forEach(file => {
+                const imgUrl = file.resolvedCover || `https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(file.name)}`;
+                const item = document.createElement('div'); item.className = 'suggested-item';
+                item.innerHTML = `<img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(file.name)}'" title="${file.name}">`;
+                item.onclick = () => { openZone(file); }; grid.appendChild(item);
+            });
+        }
+
+        async function fetchAIGameData(gameName) {
+            document.getElementById('aiStatus').style.display = 'block';
+            const fallbackSystem = () => {
+                document.getElementById('aiDescription').innerText = `${gameName} is ready to play. Dive in and experience the mechanics directly in your browser.`;
+                document.getElementById('aiNotes').innerHTML = `<li>Use your skills to adapt quickly.</li><li>Practice makes perfect.</li>`;
+                document.getElementById('pageTags').innerHTML = `<span class="tag">Browser</span><span class="tag">Game</span>`;
+                document.getElementById('pageGameBadge').innerText = "WEB";
+                document.getElementById('aiStatus').style.display = 'none';
+            };
+
+            if (!API_KEY) { setTimeout(fallbackSystem, 600); return; }
+            try {
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST", headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: MODEL_ID, messages: [{ role: "user", content: `Generate metadata for a web game called "${gameName}". Respond strictly in JSON. Format: {"description": "A 2-sentence exciting description.", "notes": ["Tip 1", "Tip 2"], "tags": ["tag1", "tag2"], "category": "Main Category"}` }] })
+                });
+                const cleanJson = (await response.json()).choices[0].message.content.trim().replace(/```json/gi, '').replace(/```/g, '');
+                const resultObj = JSON.parse(cleanJson);
+                document.getElementById('aiDescription').innerText = resultObj.description;
+                document.getElementById('aiNotes').innerHTML = resultObj.notes.map(n => `<li>${n}</li>`).join('');
+                document.getElementById('pageTags').innerHTML = resultObj.tags.map(t => `<span class="tag">${t}</span>`).join('');
+                document.getElementById('pageGameBadge').innerText = resultObj.category.toUpperCase();
+            } catch (error) { fallbackSystem(); } finally { document.getElementById('aiStatus').style.display = 'none'; }
+        }
+
+        function openZone(file) {
+            activeGameName = file.name;
+            const url = file.resolvedUrl;
+            
+            zoneFrame.src = "about:blank";
+            document.getElementById('zoneName').textContent = file.name;
+            document.getElementById('pageGameTitle').textContent = file.name;
+            document.getElementById('zoneAuthor').textContent = file.author || file.sourceName || "Unknown Source";
+            document.getElementById('toolbarIcon').src = file.resolvedCover;
+            document.getElementById('fakeUrl').textContent = "https://kraken.network/play/" + file.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            
+            document.getElementById('playsCount').innerText = file.plays || 0;
+            document.getElementById('likesCount').innerText = file.likes || 0;
+            document.getElementById('dislikesCount').innerText = file.dislikes || 0;
+            document.getElementById('likeBtn').disabled = false;
+            document.getElementById('dislikeBtn').disabled = false;
+            
+            document.getElementById('workingToast').classList.remove('show');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => { document.getElementById('workingToast').classList.add('show'); }, 5000);
+
+            incrementGameStat('plays');
+            
+            const badgeColors = [['#0c1524', '#60a5fa'], ['#152238', '#c8d6e5']][Math.floor(Math.random() * 2)];
+            document.getElementById('pageGameBadge').style.background = badgeColors[0]; document.getElementById('pageGameBadge').style.color = badgeColors[1];
+            
+            populateSidebar(); fetchAIGameData(file.name);
+            zoneViewer.style.display = "block";
+
+            if (url.startsWith("/") || (url.startsWith("http") && !url.includes("cdn.jsdelivr.net") && !url.includes("api.github.com"))) { zoneFrame.src = url; return; }
+
+            fetch(url + (url.includes('?') ? '&' : '?') + "t=" + Date.now()).then(res => res.text()).then(html => {
+                if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+                let finalHtml = html; 
+                currentBlobUrl = URL.createObjectURL(new Blob([finalHtml], { type: 'text/html;charset=utf-8' })); 
+                zoneFrame.src = currentBlobUrl; 
+            }).catch(err => { zoneFrame.src = url; });
+        }
+
+        function closeZone() { zoneViewer.style.display = "none"; zoneFrame.src = "about:blank"; if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl); activeGameName = null; document.getElementById('workingToast').classList.remove('show'); clearTimeout(toastTimeout); }
+        function reloadFrame() { const c = zoneFrame.src; zoneFrame.src = "about:blank"; setTimeout(() => { zoneFrame.src = c; }, 50); }
+        function fullscreenZone() { if (zoneFrame.requestFullscreen) zoneFrame.requestFullscreen(); else if (zoneFrame.webkitRequestFullscreen) zoneFrame.webkitRequestFullscreen(); }
+        function openSiteInAboutBlank() { let w = window.open('about:blank', '_blank'); w.document.body.style.margin = '0'; w.document.body.style.height = '100vh'; w.document.body.style.overflow = 'hidden'; let i = w.document.createElement('iframe'); i.style.border = 'none'; i.style.width = '100%'; i.style.height = '100%'; i.src = window.location.href; w.document.body.appendChild(i); window.location.replace('https://classroom.google.com'); }
+        function openGameInAboutBlank() { if (!zoneFrame.src || zoneFrame.src === 'about:blank') return; let w = window.open('about:blank', '_blank'); w.document.body.style.margin = '0'; w.document.body.style.height = '100vh'; w.document.body.style.overflow = 'hidden'; let i = w.document.createElement('iframe'); i.style.border = 'none'; i.style.width = '100%'; i.style.height = '100%'; i.src = zoneFrame.src; w.document.body.appendChild(i); closeZone(); }
+
+        window.onload = loadAllSources;
+
+        
+        const ship = document.getElementById('custom-v-cursor');
+        const gameBoundary = document.getElementById('gameBoundary');
+        let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+        let shipX = window.innerWidth / 2, shipY = window.innerHeight / 2;
+        let currentAngle = 0;
+        let isCursorVisible = false;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            
+            const overIframe = e.target.closest('.iframe-container') || e.target.tagName.toLowerCase() === 'iframe';
+
+            if (overIframe) {
+                if (isCursorVisible) { ship.style.opacity = '0'; isCursorVisible = false; }
+            } else {
+                if (!isCursorVisible) { ship.style.opacity = '1'; isCursorVisible = true; }
+            }
+        });
+
+        
+        if (gameBoundary) {
+            gameBoundary.addEventListener('mouseenter', () => { ship.style.opacity = '0'; isCursorVisible = false; });
+            gameBoundary.addEventListener('mouseleave', () => { ship.style.opacity = '1'; isCursorVisible = true; });
+        }
+
+       
+        document.addEventListener('mouseout', (e) => {
+            if (e.relatedTarget === null) {
+                ship.style.opacity = '0';
+                isCursorVisible = false;
+            }
+        });
+
+        window.addEventListener('blur', () => { ship.style.opacity = '0'; isCursorVisible = false; });
+        document.addEventListener('visibilitychange', () => { if (document.hidden) { ship.style.opacity = '0'; isCursorVisible = false; }});
+
+        
+        function animateCursor() {
+            const dx = mouseX - shipX;
+            const dy = mouseY - shipY;
+
+            shipX += dx * 0.45;
+            shipY += dy * 0.45;
+
+            if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+                let targetAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+                currentAngle = targetAngle + 90;
+            }
+
+            ship.style.transform = `translate3d(${shipX - 16}px, ${shipY - 16}px, 0) rotate(${currentAngle}deg)`;
+            requestAnimationFrame(animateCursor);
+        }
+        
+        animateCursor();
+    </script>
+</body>
+</html>

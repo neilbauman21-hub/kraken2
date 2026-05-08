@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kraken AI</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <script src="https://cdn.jsdelivr.net/gh/Sea-Math/Sea-Math.github.io@main/bbno%24.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        :root {
+            --bg-dark: #050a14;
+            --bg-panel: #0c1524;
+            --bg-input: rgba(12, 21, 36, 0.85);
+            --bg-hover: #152238;
+            --text-main: #ffffff;
+            --text-muted: #6b7fa3;
+            --grid-color: rgba(59, 130, 246, 0.03);
+            --border-color: rgba(59, 130, 246, 0.2);
+            --font-ui: 'Inter', sans-serif;
+            --font-code: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-ui);
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+            background-image: linear-gradient(var(--grid-color) 1px, transparent 1px),
+                              linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 400px;
+            transition: all 0.3s ease;
+        }
+
+        .right-panel {
+            width: 0;
+            background-color: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .right-panel.open {
+            width: 45vw;
+            min-width: 400px;
+        }
+
+        #chat-history {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 36px;
+            max-width: 840px;
+            margin: 0 auto;
+            width: 100%;
+            scroll-behavior: smooth;
+        }
+
+        .welcome-text {
+            text-align: center;
+            margin-top: 30vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .welcome-text h2 { font-size: 2.2rem; font-weight: 600; color: var(--text-main); }
+        .welcome-text p { font-size: 1.1rem; color: var(--text-muted); font-weight: 500; }
+        
+        .infinity-logo {
+            color: var(--text-main);
+            margin-bottom: 10px;
+        }
+
+        .message-row {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideUpFade {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background-color: #0c1524;
+            color: var(--text-main);
+            padding: 14px 20px;
+            border-radius: 20px 20px 4px 20px;
+            max-width: 80%;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            word-wrap: break-word;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .ai-message {
+            align-self: flex-start;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-left: 4px;
+        }
+
+        .ai-text {
+            font-size: 0.98rem;
+            line-height: 1.7;
+            color: #d1d5db;
+            word-wrap: break-word;
+            overflow-x: auto;
+        }
+
+        .ai-text p { margin-bottom: 12px; }
+        .ai-text p:last-child { margin-bottom: 0; }
+        .ai-text h1, .ai-text h2, .ai-text h3, .ai-text h4 { color: #fff; margin-top: 20px; margin-bottom: 10px; font-weight: 600; }
+        .ai-text strong { color: #fff; font-weight: 600; }
+        .ai-text ul, .ai-text ol { margin-left: 24px; margin-bottom: 16px; }
+        .ai-text li { margin-bottom: 6px; }
+        .ai-text code { background: #0c1524; padding: 3px 6px; border-radius: 6px; font-family: var(--font-code); font-size: 0.9em; border: 1px solid var(--border-color); }
+        
+        .code-container {
+            position: relative;
+            margin-top: 12px;
+            margin-bottom: 16px;
+            background: #060e1a;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0c1524;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+            font-family: var(--font-ui);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        
+        .code-actions { display: flex; gap: 8px; }
+        
+        .code-action-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+        
+        .code-action-btn:hover { background: var(--text-main); color: var(--bg-dark); }
+        
+        .ai-text pre {
+            padding: 16px;
+            overflow-x: auto;
+            margin: 0;
+            background: transparent;
+            border: none;
+        }
+        
+        .ai-text pre code { border: none; padding: 0; background: transparent; font-size: 0.9em; }
+        .ai-text table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+        .ai-text th, .ai-text td { border: 1px solid var(--border-color); padding: 10px 14px; text-align: left; }
+        .ai-text th { background-color: rgba(255, 255, 255, 0.05); color: #fff; font-weight: 600; }
+        .ai-text tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
+        .ai-text blockquote { border-left: 4px solid var(--border-color); padding-left: 12px; margin: 12px 0; color: var(--text-muted); font-style: italic; }
+
+        .chat-image-preview { max-width: 100%; max-height: 250px; border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--border-color); object-fit: cover; display: block; cursor: pointer; transition: opacity 0.2s; background: #000; }
+        .chat-image-preview:hover { opacity: 0.85; }
+        .file-attachment-pill { display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.05); padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; color: var(--text-main); margin-bottom: 10px; border: 1px solid var(--border-color); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; transition: background 0.2s; }
+        .file-attachment-pill:hover { background: rgba(255, 255, 255, 0.1); }
+
+        .pdf-document-wrapper {
+            background-color: #ffffff;
+            color: #000000;
+            border-radius: 8px;
+            padding: 40px;
+            margin: 20px 0;
+            box-shadow: 0 8px 24px rgba(255,255,255,0.05);
+            position: relative;
+            font-family: Arial, sans-serif;
+            border: 1px solid #ddd;
+        }
+        
+        .pdf-document-wrapper h1, .pdf-document-wrapper h2, .pdf-document-wrapper h3, .pdf-document-wrapper p, .pdf-document-wrapper li { color: #000000 !important; margin-bottom: 12px; }
+        .download-specific-pdf-btn { display: inline-flex; align-items: center; gap: 8px; background-color: #000000; color: #ffffff; border: 1px solid #444; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 20px; font-size: 0.9rem; transition: background-color 0.2s, transform 0.1s; }
+        .download-specific-pdf-btn:hover { background-color: #222; }
+        .download-specific-pdf-btn:active { transform: scale(0.97); }
+
+        .thinking-dots { display: flex; gap: 5px; align-items: center; height: 24px; padding: 4px 0; }
+        .thinking-dots span { width: 6px; height: 6px; background-color: var(--text-muted); border-radius: 50%; animation: pulse 1.4s infinite ease-in-out both; }
+        .thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes pulse { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; background-color: var(--text-main); } }
+
+        .action-bar { display: flex; align-items: center; gap: 6px; margin-top: 4px; opacity: 0; transition: opacity 0.2s; }
+        .message-row:hover .action-bar { opacity: 1; }
+        .action-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; padding: 6px; border-radius: 6px; }
+        .action-btn:hover { color: var(--text-main); background-color: rgba(255, 255, 255, 0.06); }
+        .action-btn svg { width: 16px; height: 16px; stroke-width: 1.5; }
+
+        .input-area {
+            padding: 0 20px 40px 20px;
+            display: flex;
+            justify-content: center;
+            background: linear-gradient(transparent, var(--bg-dark) 80%);
+            position: relative;
+        }
+        
+        .input-container {
+            display: flex;
+            align-items: flex-end;
+            background-color: var(--bg-input);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 10px 14px;
+            width: 100%;
+            max-width: 780px;
+            gap: 10px;
+            border: 1px solid var(--border-color);
+            transition: border-color 0.3s, box-shadow 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        
+        .input-container:focus-within { border-color: rgba(255, 255, 255, 0.4); box-shadow: 0 10px 40px rgba(255,255,255,0.05); }
+        
+        .icon-btn { background: transparent; border: none; color: var(--text-muted); width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; margin-bottom: 2px; }
+        .icon-btn:hover { background-color: var(--bg-hover); color: var(--text-main); }
+        .icon-btn svg { width: 20px; height: 20px; stroke-width: 1.75; }
+        
+        .code-builder-btn { color: #f59e0b; }
+        .code-builder-btn:hover { background-color: rgba(245, 158, 11, 0.1); color: #fbbf24; }
+        
+        .text-input { flex-grow: 1; background: transparent; border: none; outline: none; color: var(--text-main); font-size: 0.98rem; line-height: 1.5; min-height: 40px; max-height: 200px; padding: 8px 8px; resize: none; overflow-y: auto; }
+        .text-input::placeholder { color: #6b7280; }
+        
+        .send-btn { color: var(--text-muted); }
+        .send-btn.active { color: var(--bg-dark); background: var(--text-main); }
+
+        .options-row { display: flex; align-items: center; margin-right: auto; }
+        .dropdown { position: relative; display: flex; align-items: center; margin-bottom: 2px; }
+        .model-selector-btn { display: flex; align-items: center; gap: 8px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 8px 12px; border-radius: 12px; transition: all 0.2s; font-size: 0.9rem; font-weight: 500; }
+        .model-selector-btn:hover { background-color: var(--bg-hover); color: var(--text-main); }
+        .model-selector-btn svg { width: 16px; height: 16px; stroke-width: 1.5; }
+        
+        .dropdown-menu { position: absolute; bottom: calc(100% + 12px); left: 0; background-color: #0c1524; border: 1px solid var(--border-color); border-radius: 12px; padding: 6px; width: 250px; display: none; flex-direction: column; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8); z-index: 100; transform-origin: bottom left; }
+        .dropdown-menu.show { display: flex; animation: menuPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes menuPop { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        
+        .dropdown-item { padding: 10px 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; color: var(--text-main); border: none; background: none; width: 100%; text-align: left; border-radius: 8px; font-size: 0.9rem; transition: background 0.2s; }
+        .dropdown-item:hover { background-color: var(--bg-hover); }
+        .dropdown-item .icon { color: var(--text-muted); width: 16px; height: 16px; }
+
+        .right-panel-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-panel); }
+        .right-panel-title { font-weight: 600; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+        .close-panel-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; transition: color 0.2s; display: flex; align-items: center; justify-content: center; }
+        .close-panel-btn:hover { color: var(--text-main); }
+        #code-runner-frame { flex: 1; width: 100%; border: none; background: #ffffff; }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); z-index: 1000; align-items: center; justify-content: center; padding: 40px; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); animation: fadeIn 0.2s ease; }
+        .modal-overlay.show { display: flex; }
+        
+        .settings-modal { background: #0c1524; border: 1px solid var(--border-color); border-radius: 16px; padding: 30px; width: 100%; max-width: 450px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+        .settings-modal h3 { margin-bottom: 20px; font-size: 1.2rem; }
+        .settings-modal input { width: 100%; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: white; border-radius: 8px; margin-bottom: 20px; font-family: monospace; outline: none; transition: border 0.3s; }
+        .settings-modal input:focus { border-color: var(--text-main); }
+        .settings-modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+        .btn-secondary { background: transparent; border: 1px solid var(--border-color); color: white; padding: 10px 16px; border-radius: 8px; cursor: pointer; }
+        .btn-primary { background: white; border: none; color: black; font-weight: 600; padding: 10px 16px; border-radius: 8px; cursor: pointer; }
+        
+        .viewer-content { max-width: 90vw; max-height: 90vh; background: #0c1524; border: 1px solid var(--border-color); border-radius: 12px; overflow: auto; padding: 30px; color: var(--text-main); white-space: pre-wrap; font-size: 0.95rem; line-height: 1.6; font-family: monospace; }
+        .viewer-content img { max-width: 100%; max-height: 85vh; border-radius: 8px; display: block; margin: 0 auto; }
+        .viewer-close { position: absolute; top: 20px; right: 30px; font-size: 40px; color: var(--text-muted); cursor: pointer; transition: color 0.2s; line-height: 1; }
+        .viewer-close:hover { color: #fff; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+</head>
+<body>
+
+    <div class="main-content">
+
+        <div id="chat-history"></div>
+        <input type="file" id="file-upload" accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.js,.css" style="display: none;">
+        
+        <div class="input-area">
+            <div class="input-container">
+                <div class="options-row">
+                    <div class="dropdown">
+                        <button class="model-selector-btn" id="model-toggle" onclick="toggleMenu('model-menu')">
+                            <svg viewBox="0 0 24 24"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/><path d="M12 8V4"/><path d="M10 4h4"/></svg>
+                            <span id="current-model-name">Gemini 2.0 (Vision)</span>
+                        </button>
+                        <div class="dropdown-menu" id="model-menu">
+                            <button class="dropdown-item" onclick="selectModel('Gemini 2.0 (Vision)')">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                                Gemini 2.0 (Vision)
+                            </button>
+                            <button class="dropdown-item" onclick="selectModel('Minimax M2.5')">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="4.93" y1="19.07" x2="19.07" y2="4.93"/></svg>
+                                Minimax M2.5
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="dropdown">
+                        <button class="model-selector-btn" id="mode-toggle" onclick="toggleMenu('mode-menu')">
+                            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                            <span id="current-mode-name">Pro Mode</span>
+                        </button>
+                        <div class="dropdown-menu" id="mode-menu">
+                            <button class="dropdown-item" onclick="selectMode('Pro Mode')">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                                Pro Mode
+                            </button>
+                            <button class="dropdown-item" onclick="selectMode('Dumb Mode')">
+                                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                                Dumb Mode
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button class="icon-btn" onclick="clearChat()" title="Clear Chat" style="margin-left: 6px;">
+                        <svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                    
+                </div>
+
+                <button class="icon-btn" onclick="document.getElementById('file-upload').click()" title="Attach File">
+                    <svg viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+                <textarea class="text-input" id="user-input" placeholder="Message Kraken AI..." rows="1" oninput="autoResize(this)" onkeydown="handleKeyPress(event)"></textarea>
+                
+                <button class="icon-btn code-builder-btn" onclick="handleCodeBuilder()" title="Peak Code Builder (Dual Model)">
+                    <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </button>
+                
+                <button class="icon-btn send-btn" id="send-btn" onclick="handleSend()">
+                    <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-panel" id="right-panel">
+        <div class="right-panel-header">
+            <div class="right-panel-title">
+                <svg viewBox="0 0 24 24" width="18" height="18"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                Live Preview
+            </div>
+            <button class="close-panel-btn" onclick="closeRightPanel()">
+                <svg viewBox="0 0 24 24" width="20" height="20"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <iframe id="code-runner-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
+    </div>
+
+    <div id="viewer-modal" class="modal-overlay">
+        <span class="viewer-close" onclick="closeViewer()">&times;</span>
+        <div id="viewer-content" class="viewer-content"></div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay">
+        <div class="settings-modal">
+            <h3>API Configuration</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">Enter your OpenRouter API Key to start chatting.</p>
+            <input type="password" id="api-key-input" placeholder="sk-or-v1-...">
+            <div class="settings-modal-actions">
+                <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+                <button class="btn-primary" onclick="saveSettings()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        marked.use({ breaks: true });
+        
+        let API_KEY = localStorage.getItem('infinite_ai_key') || "";
+        if (!API_KEY) {
+            try {
+                if (typeof bbnoSecret !== 'undefined' && bbnoSecret.trim() !== "") {
+                    API_KEY = atob(bbnoSecret.trim());
+                    localStorage.setItem('infinite_ai_key', API_KEY);
+                }
+            } catch (e) {}
+        }
+
+        const MODEL_MAP = {
+            'Gemini 2.0 (Vision)': 'nvidia/nemotron-3-super-120b-a12b:free',
+            'Minimax M2.5': 'minimax/minimax-m2.5:free'
+        };
+
+        let currentUIModel = 'Gemini 2.0 (Vision)';
+        let currentUIMode = 'Pro Mode';
+        let isGenerating = false;
+        
+        let chatContext = [];
+        let chatHistoryHTML = "";
+        
+        let fileData = null;
+        let fileName = null;
+        let fileType = null;
+        let baseDataCache = null;
+        const fileStorage = {};
+        let fileIdCounter = 0;
+
+        function openSettings() {
+            document.getElementById('api-key-input').value = API_KEY;
+            document.getElementById('settings-modal').classList.add('show');
+        }
+        
+        function closeSettings() {
+            document.getElementById('settings-modal').classList.remove('show');
+        }
+
+        function saveSettings() {
+            API_KEY = document.getElementById('api-key-input').value.trim();
+            localStorage.setItem('infinite_ai_key', API_KEY);
+            closeSettings();
+        }
+
+        function openRightPanel(codeContent, lang) {
+            const panel = document.getElementById('right-panel');
+            const iframe = document.getElementById('code-runner-frame');
+            panel.classList.add('open');
+            
+            let htmlDoc = codeContent;
+            
+            if (lang === 'javascript' || lang === 'js') {
+                htmlDoc = `<!DOCTYPE html><html><head><style>body{background:#fff;color:#000;font-family:sans-serif;padding:20px;}</style></head><body><h3>JavaScript Execution Output</h3><div id="output"></div><script>
+                    const originalConsoleLog = console.log;
+                    console.log = function(...args) {
+                        originalConsoleLog.apply(console, args);
+                        const outputDiv = document.getElementById('output');
+                        const msg = document.createElement('div');
+                        msg.style.borderBottom = '1px solid #eee';
+                        msg.style.padding = '5px 0';
+                        msg.style.fontFamily = 'monospace';
+                        msg.innerText = args.join(' ');
+                        outputDiv.appendChild(msg);
+                    };
+                    try {
+                        ${codeContent}
+                    } catch(err) {
+                        console.log('<span style="color:red">Error: ' + err.message + '</span>');
+                    }
+                <\/script></body></html>`;
+            } else if (lang === 'css') {
+                htmlDoc = `<!DOCTYPE html><html><head><style>${codeContent}</style></head><body><h3>CSS Preview</h3><div class="test-element">This is a test element influenced by your CSS.</div></body></html>`;
+            }
+
+            iframe.srcdoc = htmlDoc;
+        }
+
+        function closeRightPanel() {
+            const panel = document.getElementById('right-panel');
+            panel.classList.remove('open');
+            document.getElementById('code-runner-frame').srcdoc = '';
+        }
+
+        function saveChatData() {
+            chatHistoryHTML = document.getElementById('chat-history').innerHTML;
+            localStorage.setItem('infinite_ai_single_context', JSON.stringify(chatContext));
+            localStorage.setItem('infinite_ai_single_html', chatHistoryHTML);
+        }
+
+        function loadChatData() {
+            const savedContext = localStorage.getItem('infinite_ai_single_context');
+            const savedHTML = localStorage.getItem('infinite_ai_single_html');
+            if (savedContext && savedHTML) {
+                try {
+                    chatContext = JSON.parse(savedContext);
+                    document.getElementById('chat-history').innerHTML = savedHTML;
+                    setTimeout(() => {
+                        const history = document.getElementById('chat-history');
+                        history.scrollTop = history.scrollHeight;
+                    }, 50);
+                } catch (e) {
+                    clearChat();
+                }
+            } else {
+                clearChat();
+            }
+        }
+
+        function getSystemPrompt() {
+            let basePrompt = "You are Kraken AI, an elite AI assistant. Always format responses in clean Markdown. Never wrap responses in a JSON object. If asked to generate a web application or code snippet, output clean code blocks. If a user asks for a 'pdf document', wrap the exact content in <div class='pdf-document-wrapper'>...</div> with standard HTML tags inside.";
+            if (currentUIMode === 'Dumb Mode') {
+                return basePrompt + " CRITICAL DIRECTIVE: You are in DUMB MODE. Act highly incompetent, make silly logic errors, give obviously terrible (but safe) advice, and use basic vocabulary. Refuse to be smart.";
+            } else {
+                return basePrompt + " CRITICAL DIRECTIVE: You are in PRO MODE. Act as a highly capable, logical, and exhaustively precise expert. Output perfect code and thorough explanations.";
+            }
+        }
+
+        function clearChat() {
+            if (isGenerating) return;
+            chatContext = [{ role: "system", content: getSystemPrompt() }];
+            document.getElementById('chat-history').innerHTML = `<div class="welcome-text" id="welcome-msg"><div class="infinity-logo"><svg viewBox="-5.5 0 32 32" width="60" height="60" fill="currentColor"><path d="M4.040 20.12v0c-0.88 0-1.84-0.36-2.56-0.92-0.64-0.56-1.44-1.52-1.44-3.2 0-2.76 2.28-4 3.76-4.12 1.8-0.16 4.24 1.36 6.8 3.12 2.52-1.68 4.88-3.2 6.68-3.12 1.44 0.080 3.6 1.24 3.6 4.12 0 2.8-2.12 4-3.52 4.12-0.080 0-0.16 0-0.24 0-1.76 0-4.080-1.48-6.52-3.12-2.52 1.64-4.76 3.12-6.56 3.12zM4.040 13.56c-0.040 0-0.080 0-0.12 0-0.6 0.040-2.2 0.6-2.2 2.44 0 2 1.48 2.36 2.36 2.44 1.16 0.12 3.12-1.2 5.040-2.44-2-1.24-3.88-2.44-5.080-2.44zM12.080 16c1.96 1.32 4 2.52 5.12 2.44 0.68-0.040 2-0.64 2-2.44 0-1.84-1.32-2.4-2.040-2.44-1.16-0.080-3.16 1.16-5.080 2.44z"></path></svg></div><h2>KRAKEN AI</h2><p>How can I help you today?</p></div>`;
+            saveChatData();
+        }
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+            checkInput();
+        }
+
+        function toggleMenu(menuId) {
+            const menu = document.getElementById(menuId);
+            const isShowing = menu.classList.contains('show');
+            document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+            if (!isShowing) menu.classList.add('show');
+        }
+
+        function selectModel(modelName) {
+            currentUIModel = modelName;
+            document.getElementById('current-model-name').innerText = modelName;
+            toggleMenu('model-menu');
+        }
+
+        function selectMode(modeName) {
+            currentUIMode = modeName;
+            document.getElementById('current-mode-name').innerText = modeName;
+            toggleMenu('mode-menu');
+            if (chatContext.length > 0) {
+                if (chatContext[0].role === 'system') {
+                    chatContext[0].content = getSystemPrompt();
+                } else {
+                    chatContext.unshift({ role: "system", content: getSystemPrompt() });
+                }
+                saveChatData();
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('show'));
+            }
+        });
+
+        document.getElementById('file-upload').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            processFile(file);
+        });
+
+        document.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const blob = item.getAsFile();
+                    processFile(blob);
+                }
+            }
+        });
+
+        function processFile(file) {
+            fileName = file.name || "Pasted_Image.png";
+            if (file.type.startsWith('image/')) {
+                document.getElementById('user-input').placeholder = `Processing image...`;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width, height = img.height;
+                        const maxDim = 1000; 
+                        if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; } 
+                        else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        baseDataCache = canvas.toDataURL('image/jpeg', 0.85); 
+                        fileData = "Base64 image loaded. Refer to vision payload.";
+                        fileType = 'image';
+                        document.getElementById('user-input').placeholder = `Image Attached: ${fileName}`;
+                        checkInput();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            } 
+            else if (file.type === 'application/pdf') {
+                document.getElementById('user-input').placeholder = `Extracting PDF...`;
+                const reader = new FileReader();
+                reader.onload = async function() {
+                    try {
+                        const typedarray = new Uint8Array(this.result);
+                        const pdf = await pdfjsLib.getDocument({data: typedarray}).promise;
+                        let fullText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            fullText += `--- Page ${i} ---\n` + textContent.items.map(item => item.str).join(' ') + '\n\n';
+                        }
+                        fileData = fullText; fileType = 'text'; baseDataCache = null;
+                        document.getElementById('user-input').placeholder = `PDF Attached: ${fileName}`;
+                    } catch (err) {
+                        alert("Error reading PDF content.");
+                        document.getElementById('user-input').placeholder = "Message Kraken AI...";
+                    } finally { checkInput(); }
+                };
+                reader.readAsArrayBuffer(file);
+            } 
+            else {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    fileData = event.target.result; fileType = 'text'; baseDataCache = null;
+                    document.getElementById('user-input').placeholder = `File Attached: ${fileName}`;
+                    checkInput();
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function checkInput() {
+            const val = document.getElementById('user-input').value.trim();
+            const btn = document.getElementById('send-btn');
+            if(val.length > 0 || fileData) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (!isGenerating) handleSend();
+            }
+        }
+
+        function openViewer(type, contentOrId) {
+            const modal = document.getElementById('viewer-modal');
+            const contentDiv = document.getElementById('viewer-content');
+            if (type === 'image') {
+                contentDiv.innerHTML = `<img src="${contentOrId}" alt="Viewed Image">`;
+                contentDiv.style.background = 'transparent'; contentDiv.style.border = 'none'; contentDiv.style.padding = '0';
+            } else if (type === 'text') {
+                contentDiv.innerHTML = (fileStorage[contentOrId] || 'Content not found.').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                contentDiv.style.background = '#111'; contentDiv.style.border = '1px solid #333'; contentDiv.style.padding = '40px';
+            }
+            modal.classList.add('show');
+        }
+
+        function closeViewer() {
+            document.getElementById('viewer-modal').classList.remove('show');
+            document.getElementById('viewer-content').innerHTML = '';
+        }
+
+        document.getElementById('viewer-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeViewer();
+        });
+        document.getElementById('settings-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeSettings();
+        });
+
+        function downloadPDF(btn) {
+            const content = btn.closest('.ai-message').querySelector('.ai-text');
+            const clone = content.cloneNode(true);
+            clone.style.backgroundColor = '#ffffff'; clone.style.color = '#000000'; clone.style.padding = '40px';
+            
+            const allElements = clone.querySelectorAll('*');
+            for(let i = 0; i < allElements.length; i++) {
+                allElements[i].style.color = '#000000';
+                if (allElements[i].tagName === 'PRE' || allElements[i].classList.contains('code-container')) {
+                    allElements[i].style.backgroundColor = '#f8f9fa'; allElements[i].style.border = '1px solid #e9ecef';
+                }
+                if(allElements[i].classList.contains('code-header')) { allElements[i].style.display = 'none'; }
+            }
+            
+            document.body.appendChild(clone);
+            const opt = { margin: [0.5, 0.5], filename: 'document.pdf', image: { type: 'jpeg', quality: 1 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+            html2pdf().set(opt).from(clone).save().then(() => document.body.removeChild(clone));
+        }
+
+        function copyText(btn) {
+            const textToCopy = btn.closest('.ai-message').querySelector('.ai-text').innerText;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const origIcon = btn.innerHTML;
+                btn.innerHTML = `<svg viewBox="0 0 24 24" style="color:var(--text-main)"><path d="M20 6 9 17l-5-5"/></svg>`;
+                setTimeout(() => btn.innerHTML = origIcon, 2000);
+            });
+        }
+
+        function renderAIMessageContent(textContainer, rawText) {
+            textContainer.innerHTML = marked.parse(rawText);
+            
+            const preBlocks = textContainer.querySelectorAll('pre');
+            preBlocks.forEach(pre => {
+                const codeBlock = pre.querySelector('code');
+                if (!codeBlock) return;
+                
+                const langMatch = codeBlock.className.match(/language-(\w+)/);
+                const lang = langMatch ? langMatch[1] : 'text';
+                const codeContent = codeBlock.innerText;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'code-container';
+                
+                const header = document.createElement('div');
+                header.className = 'code-header';
+                header.innerHTML = `<span>${lang.toUpperCase()}</span>`;
+                
+                const actions = document.createElement('div');
+                actions.className = 'code-actions';
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'code-action-btn';
+                copyBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy';
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(codeContent);
+                    copyBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M20 6 9 17l-5-5"/></svg> Copied';
+                    setTimeout(() => copyBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy', 2000);
+                };
+                actions.appendChild(copyBtn);
+
+                if (['html', 'javascript', 'js', 'css'].includes(lang)) {
+                    const runBtn = document.createElement('button');
+                    runBtn.className = 'code-action-btn';
+                    runBtn.style.color = '#10b981';
+                    runBtn.style.borderColor = '#10b981';
+                    runBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Code';
+                    runBtn.onclick = () => openRightPanel(codeContent, lang);
+                    actions.appendChild(runBtn);
+                }
+
+                header.appendChild(actions);
+                wrapper.appendChild(header);
+                
+                pre.parentNode.insertBefore(wrapper, pre);
+                wrapper.appendChild(pre);
+            });
+            
+            const pdfWrappers = textContainer.querySelectorAll('.pdf-document-wrapper');
+            pdfWrappers.forEach(wrapper => {
+                const dlButton = document.createElement('button');
+                dlButton.className = 'download-specific-pdf-btn';
+                dlButton.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Document PDF`;
+                dlButton.onclick = function() {
+                    const clone = wrapper.cloneNode(true);
+                    clone.removeChild(clone.lastChild); 
+                    const opt = { margin: [0.75, 0.75], filename: 'Document.pdf', image: { type: 'jpeg', quality: 1 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+                    document.body.appendChild(clone);
+                    html2pdf().set(opt).from(clone).save().then(() => document.body.removeChild(clone));
+                };
+                wrapper.appendChild(dlButton);
+            });
+        }
+
+        async function handleCodeBuilder() {
+            if (isGenerating) return;
+            if (!API_KEY || API_KEY.trim() === "") {
+                openSettings();
+                return;
+            }
+            
+            const inputField = document.getElementById("user-input");
+            let messageText = inputField.value.trim();
+            if (messageText === "" && !fileData) return;
+
+            const welcome = document.getElementById("welcome-msg");
+            if (welcome) welcome.remove();
+
+            appendUserMessage(messageText, fileName, fileData, fileType, baseDataCache);
+            inputField.value = ""; inputField.style.height = 'auto';
+
+            let msgContent = messageText;
+            if(fileData) {
+                if (fileType === 'image' && baseDataCache) {
+                    msgContent = [
+                        { type: "text", text: messageText ? messageText : "Analyze this image." },
+                        { type: "image_url", image_url: { url: baseDataCache } }
+                    ];
+                } else {
+                    msgContent = messageText + (messageText ? `\n\n` : ``) + `--- Attached File (${fileName}) ---\n${fileData}\n--- End File ---`;
+                }
+            }
+
+            if(chatContext.length > 0 && chatContext[0].role === 'system') {
+                chatContext[0].content = getSystemPrompt() + " YOU ARE IN PEAK CODE BUILDER MODE. Output heavily optimized and perfect code.";
+            } else {
+                chatContext.unshift({ role: "system", content: getSystemPrompt() + " YOU ARE IN PEAK CODE BUILDER MODE." });
+            }
+            
+            chatContext.push({ role: "user", content: msgContent });
+
+            isGenerating = true; 
+            fileData = null; fileName = null; fileType = null; baseDataCache = null;
+            inputField.placeholder = "Message Kraken AI...";
+            document.getElementById('file-upload').value = '';
+            checkInput();
+            
+            const aiMessageDiv = appendAIMessage('<div class="thinking-dots"><span></span><span></span><span></span></div>'); 
+            
+            try {
+                const req1 = fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST", 
+                    headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.origin, "X-Title": "Kraken AI" },
+                    body: JSON.stringify({ model: 'google/gemini-2.0-pro-exp-02-05:free', messages: chatContext })
+                }).then(r => r.json());
+
+                const req2 = fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST", 
+                    headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.origin, "X-Title": "Kraken AI" },
+                    body: JSON.stringify({ model: 'minimax/minimax-m2.5:free', messages: chatContext })
+                }).then(r => r.json());
+
+                const [res1, res2] = await Promise.allSettled([req1, req2]);
+
+                let text1 = "Failed to load Gemini response.";
+                let text2 = "Failed to load Minimax response.";
+
+                if (res1.status === 'fulfilled' && res1.value.choices) {
+                    text1 = res1.value.choices[0].message.content;
+                }
+                
+                if (res2.status === 'fulfilled' && res2.value.choices) {
+                    text2 = res2.value.choices[0].message.content;
+                }
+
+                const combinedText = `# 🚀 Peak Code Builder Synthesis\n\n## 🧠 Gemini 2.0 Approach\n${text1}\n\n---\n\n## ⚡ Minimax M2.5 Approach\n${text2}`;
+
+                const textContainer = aiMessageDiv.querySelector('.ai-text');
+                renderAIMessageContent(textContainer, combinedText);
+                chatContext.push({ role: "assistant", content: combinedText });
+
+            } catch (err) { 
+                aiMessageDiv.querySelector('.ai-text').innerText = "Peak Code Builder execution failed."; 
+                chatContext.pop();
+            } finally {
+                isGenerating = false; 
+                inputField.focus();
+                checkInput();
+                saveChatData();
+            }
+        }
+
+        async function handleSend(isRedo = false) {
+            if (isGenerating) return;
+            if (!API_KEY || API_KEY.trim() === "") {
+                openSettings();
+                return;
+            }
+            
+            const inputField = document.getElementById("user-input");
+            let messageText = inputField.value.trim();
+            const targetModelID = MODEL_MAP[currentUIModel];
+            
+            if (isRedo && chatContext.length >= 2) {
+                chatContext.pop(); 
+                if(chatContext.length > 1) {
+                    const lastUser = chatContext[chatContext.length - 1];
+                    messageText = Array.isArray(lastUser.content) ? lastUser.content[0].text : lastUser.content;
+                }
+            } else {
+                if (messageText === "" && !fileData) return;
+                const welcome = document.getElementById("welcome-msg");
+                if (welcome) welcome.remove();
+                
+                appendUserMessage(messageText, fileName, fileData, fileType, baseDataCache);
+                inputField.value = ""; inputField.style.height = 'auto';
+                
+                let msgContent = messageText;
+                if(fileData) {
+                    if (fileType === 'image' && baseDataCache) {
+                        msgContent = [
+                            { type: "text", text: messageText ? messageText : "Analyze this image." },
+                            { type: "image_url", image_url: { url: baseDataCache } }
+                        ];
+                    } else {
+                        msgContent = messageText + (messageText ? `\n\n` : ``) + `--- Attached File (${fileName}) ---\n${fileData}\n--- End File ---`;
+                    }
+                }
+                
+                if(chatContext.length > 0 && chatContext[0].role === 'system') {
+                    chatContext[0].content = getSystemPrompt();
+                }
+                chatContext.push({ role: "user", content: msgContent });
+            }
+
+            isGenerating = true; 
+            fileData = null; fileName = null; fileType = null; baseDataCache = null;
+            inputField.placeholder = "Message Kraken AI...";
+            document.getElementById('file-upload').value = '';
+            checkInput();
+            
+            const aiMessageDiv = appendAIMessage('<div class="thinking-dots"><span></span><span></span><span></span></div>'); 
+            
+            try {
+                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST", 
+                    headers: { "Authorization": `Bearer ${API_KEY}`, "Content-Type": "application/json", "HTTP-Referer": window.location.origin, "X-Title": "Kraken AI" },
+                    body: JSON.stringify({ model: targetModelID, messages: chatContext })
+                });
+                
+                const data = await res.json();
+                const textContainer = aiMessageDiv.querySelector('.ai-text');
+                
+                if (data.error && data.error.message) {
+                     textContainer.innerText = `API Error: ${data.error.message}`;
+                     chatContext.pop();
+                } else if (data.choices && data.choices.length > 0) {
+                    let rawText = data.choices[0].message.content;
+                    renderAIMessageContent(textContainer, rawText);
+                    chatContext.push({ role: "assistant", content: rawText });
+                } else {
+                    textContainer.innerText = `Error: ${JSON.stringify(data)}`;
+                    chatContext.pop(); 
+                }
+            } catch (err) { 
+                aiMessageDiv.querySelector('.ai-text').innerText = "Network transmission failed. Please check your internet connection."; 
+                chatContext.pop();
+            } finally {
+                isGenerating = false; 
+                inputField.focus();
+                checkInput();
+                saveChatData();
+            }
+        }
+
+        function appendUserMessage(text, attachedName, attachedData, attachedType, baseRender) {
+            const chatHistory = document.getElementById("chat-history");
+            const div = document.createElement("div"); div.className = "message-row";
+            let attachmentHTML = '';
+            if (attachedName) {
+                if (attachedType === 'image' && baseRender) {
+                    attachmentHTML = `<img src="${baseRender}" alt="${attachedName}" class="chat-image-preview" onclick="openViewer('image', this.src)" title="Click to view">`;
+                } else {
+                    const fileId = 'file_' + (++fileIdCounter);
+                    fileStorage[fileId] = attachedData;
+                    attachmentHTML = `
+                    <div class="file-attachment-pill" onclick="openViewer('text', '${fileId}')" title="Click to view file">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        ${attachedName}
+                    </div><br>`;
+                }
+            }
+            const lineBreak = (attachmentHTML && text && attachedType === 'image') ? '<br>' : '';
+            div.innerHTML = `<div class="user-message">${attachmentHTML}${lineBreak}${text.replace(/\n/g, '<br>')}</div>`;
+            chatHistory.appendChild(div);
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        function appendAIMessage(content) {
+            const chatHistory = document.getElementById("chat-history");
+            const div = document.createElement("div"); div.className = "message-row";
+            div.innerHTML = `
+                <div class="ai-message">
+                    <div class="ai-text">${content}</div>
+                    <div class="action-bar">
+                        <button class="action-btn" title="Download Thread PDF" onclick="downloadPDF(this)">
+                            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+                        </button>
+                        <button class="action-btn" onclick="copyText(this)" title="Copy Text">
+                            <svg viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                        </button>
+                        <button class="action-btn" onclick="handleSend(true)" title="Regenerate">
+                            <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        </button>
+                    </div>
+                </div>`;
+            chatHistory.appendChild(div);
+            window.scrollTo(0, document.body.scrollHeight);
+            return div;
+        }
+
+        loadChatData();
+    </script>
+</body>
+</html>

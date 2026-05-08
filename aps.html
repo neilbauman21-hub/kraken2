@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kraken Apps</title>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-outer: #050a14;
+            --bg-panel: #0a1020;
+            --bg-card: #0c1524;
+            --border-color: #1a2744;
+            --accent-cyan: #3b82f6; 
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            --text-main: #ffffff;
+            --text-sub: #c8d6e5;
+            --text-muted: #6b7fa3;
+            --btn-bg: #0c1524;
+            --btn-hover: #152238;
+            --tag-bg: #0c1524;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; cursor: none !important; }
+        iframe { cursor: auto !important; }
+        
+        body { background-color: var(--bg-outer); color: var(--text-main); height: 100vh; width: 100vw; display: flex; overflow: hidden; }
+
+        #custom-v-cursor {
+            position: fixed; top: 0; left: 0;
+            width: 32px; height: 32px;
+            z-index: 2147483647; 
+            pointer-events: none;
+            will-change: transform;
+            opacity: 0; 
+            transition: opacity 0.1s ease-out;
+        }
+
+        #app-container {
+            display: flex; flex-direction: column; 
+            width: 100%; height: 100vh;
+            background-color: var(--bg-outer);
+            position: relative;
+        }
+
+        .main-panel { flex-grow: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; background: transparent; width: 100%; }
+        .content-scroll { position: relative; z-index: 10; width: 100%; height: 100%; overflow-y: auto; padding: 60px 40px 100px 40px; display: flex; flex-direction: column; align-items: center; }
+        .content-scroll::-webkit-scrollbar { width: 8px; }
+        .content-scroll::-webkit-scrollbar-track { background: transparent; }
+        .content-scroll::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
+
+        .top-bar-actions { position: absolute; top: 30px; right: 40px; z-index: 50; display: flex; gap: 15px; }
+        .action-btn { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-sub); width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.3s ease; }
+        .action-btn:hover { color: var(--accent-cyan); border-color: var(--accent-cyan); box-shadow: 0 0 15px var(--accent-glow); }
+
+        .header-titles { text-align: center; margin-bottom: 20px; }
+        .main-title { font-size: 4rem; font-weight: 800; color: #ffffff; letter-spacing: 1px; margin-bottom: 5px; text-transform: uppercase; }
+        .subtitle { color: var(--text-sub); font-size: 1.1rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+        .search-wrapper { width: 100%; max-width: 500px; margin: 0 auto 40px auto; position: relative; z-index: 101; }
+        .inputcontainer { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 14px 20px; display: flex; align-items: center; transition: all 0.3s ease; border-radius: 12px; }
+        .inputcontainer:focus-within { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.05); }
+        .inputcontainer input { background: none; border: none; outline: none; color: var(--text-main); font-size: 1.1rem; width: 100%; text-align: center; font-style: italic; }
+        .inputcontainer input:focus { text-align: left; font-style: normal; }
+        .inputcontainer input::placeholder { color: var(--text-muted); }
+
+        .combined-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 25px; width: 100%; max-width: 1400px; margin: 0 auto; }
+        .zone-item { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; position: relative; aspect-ratio: 1; transition: transform 0.2s ease, border-color 0.2s ease; }
+        .zone-item:hover { transform: scale(1.05); border-color: var(--accent-cyan); }
+        .zone-item img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .zone-name { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.95)); color: white; padding: 30px 15px 15px 15px; font-size: 1rem; font-weight: 800; text-align: center; z-index: 5; transition: opacity 0.2s; }
+        .hover-stats { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(3px); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; opacity: 0; transition: opacity 0.2s; z-index: 10; pointer-events: none; }
+        .zone-item:hover .hover-stats { opacity: 1; }
+        .zone-item:hover .zone-name { opacity: 0; }
+        .stat-row { display: flex; align-items: center; gap: 10px; font-size: 1.1rem; font-weight: 800; }
+
+        #zoneViewer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-outer); z-index: 9500; display: none; overflow-y: auto; }
+        #zoneViewer::-webkit-scrollbar { width: 8px; }
+        #zoneViewer::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        
+        .game-page-container { max-width: 1200px; margin: 0 auto; padding: 20px 40px; }
+        .back-nav { margin-bottom: 20px; }
+        .back-nav button { background: var(--btn-bg); border: 1px solid var(--border-color); color: white; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 10px; transition: 0.2s; }
+        .back-nav button:hover { background: var(--btn-hover); border-color: var(--text-muted); }
+
+        .game-col-main { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+        .iframe-container { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px 12px 0 0; overflow: hidden; border: 1px solid var(--border-color); border-bottom: none; }
+        #zoneFrame { width: 100%; height: 100%; border: none; }
+        
+        .game-toolbar { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 0 0 12px 12px; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .toolbar-left { display: flex; align-items: center; gap: 12px; }
+        .toolbar-icon { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border-color); }
+        .toolbar-title span:first-child { font-weight: 800; font-size: 1.1rem; display: block; }
+        .toolbar-title span:last-child { font-size: 0.75rem; color: var(--text-muted); }
+        .toolbar-right { display: flex; gap: 8px; }
+        .toolbar-btn { background: var(--btn-bg); border: 1px solid var(--border-color); color: var(--text-sub); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: 0.2s; font-size: 1rem; }
+        .toolbar-btn.wide { width: auto; padding: 0 15px; gap: 8px; font-weight: 600; font-size: 0.9rem;}
+        .toolbar-btn:hover { background: var(--btn-hover); color: var(--accent-cyan); border-color: var(--text-sub); }
+
+        .game-meta-header { margin-top: 10px; }
+        .game-meta-title { display: flex; align-items: center; gap: 15px; margin-bottom: 12px; }
+        .game-meta-title h1 { font-size: 2.2rem; font-weight: 900; letter-spacing: -0.5px; }
+        .fire-stats { font-size: 0.85rem; color: var(--text-sub); font-weight: 800; margin-left: auto; }
+        .tags-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tag { background: var(--tag-bg); color: var(--text-sub); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .info-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; }
+        .info-card.full-width { grid-column: 1 / -1; }
+        .info-card h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 15px; color: white; display: flex; align-items: center; gap: 10px; }
+        .info-card p, .info-card ul { color: var(--text-sub); font-size: 0.95rem; line-height: 1.6; }
+        .info-card ul { margin-left: 20px; }
+        .accent-icon { color: var(--text-main); font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+
+    <svg id="custom-v-cursor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2 L22 22 L12 18 L2 22 Z" fill="#3b82f6" />
+    </svg>
+
+    <div id="app-container">
+        <main class="main-panel">
+            <div class="top-bar-actions">
+                <button class="action-btn" onclick="openSiteInAboutBlank()"><i class="fa-solid fa-up-right-from-square"></i></button>
+            </div>
+            
+            <div class="content-scroll">
+                <div class="header-titles">
+                    <h1 class="main-title">Kraken Apps</h1>
+                    <p class="subtitle" id="dataCount">Loading apps...</p>
+                </div>
+                <div class="search-wrapper">
+                    <div class="inputcontainer">
+                        <input type="text" id="dumbSearchInput" placeholder="Search applications..." autocomplete="off">
+                    </div>
+                </div>
+                <div id="zonesWrapper" class="combined-grid"></div>
+            </div>
+        </main>
+    </div>
+
+    <div id="zoneViewer">
+        <div class="game-page-container">
+            <div class="back-nav">
+                <button onclick="closeZone()"><i class="fa-solid fa-chevron-left"></i> Back to Apps</button>
+            </div>
+                
+            <div class="game-col-main">
+                <div>
+                    <div class="iframe-container" id="iframeBox">
+                        <iframe id="zoneFrame" allowfullscreen="true" webkitallowfullscreen="true" mozallowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"></iframe>
+                    </div>
+                    <div class="game-toolbar">
+                        <div class="toolbar-left">
+                            <img src="" id="toolbarIcon" class="toolbar-icon" alt="icon">
+                            <div class="toolbar-title">
+                                <span id="zoneName">App Name</span>
+                                <span id="zoneAuthor">Author Network</span>
+                            </div>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="toolbar-btn wide" id="likeBtn" onclick="incrementGameStat('likes')"><i class="fa-regular fa-thumbs-up"></i> <span id="likesCount">...</span></button>
+                            <button class="toolbar-btn wide" id="dislikeBtn" onclick="incrementGameStat('dislikes')"><i class="fa-regular fa-thumbs-down"></i> <span id="dislikesCount">...</span></button>
+                            <button class="toolbar-btn" onclick="openGameInAboutBlank()"><i class="fa-solid fa-up-right-from-square"></i></button>
+                            <button class="toolbar-btn" onclick="reloadFrame()"><i class="fa-solid fa-rotate-right"></i></button>
+                            <button class="toolbar-btn" onclick="fullscreenZone()"><i class="fa-solid fa-expand"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="game-meta-header">
+                    <div class="game-meta-title">
+                        <h1 id="pageGameTitle">Loading...</h1>
+                        <span class="fire-stats"><i class="fa-solid fa-eye"></i> <span id="playsCount">0</span> Views</span>
+                    </div>
+                    <div class="tags-container" id="pageTags"></div>
+                </div>
+
+                <div class="info-grid">
+                    <div class="info-card full-width">
+                        <h3><i class="fa-solid fa-circle-info accent-icon"></i> Overview</h3>
+                        <p id="appDesc">Loading description...</p>
+                    </div>
+                    <div class="info-card">
+                        <h3><i class="fa-solid fa-bolt accent-icon"></i> Notes & Tips</h3>
+                        <ul id="appNotes"><li>Loading...</li></ul>
+                    </div>
+                    <div class="info-card">
+                        <h3>Details</h3>
+                        <p>Typically optimized for Web. Use mouse and keyboard as instructed by the application interface.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const firebaseConfig = { apiKey: "AIzaSyCpQ0VzuKLgi5uWHqi0oqCm3acAxqwu56k", authDomain: "estdryfgihojkl.firebaseapp.com", projectId: "estdryfgihojkl", storageBucket: "estdryfgihojkl.firebasestorage.app", messagingSenderId: "655218285663", appId: "1:655218285663:web:9423da27bf31474c38cfea", measurementId: "G-9P0PJF7NVQ" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        const manualApps = [
+            {
+                name: "Now.gg (froggie)",
+                author: "Froggie",
+                url: "embed#https://nowgg.fun",
+                cover: "assets/img/apps/logo2.png",
+                description: "a site for a now.gg bypass",
+                notes: ["idk hope it works"],
+                tags: ["Games", "Roblox"]
+            }
+
+        ];
+
+        let firebaseStats = {};
+        let activeGameName = null;
+        let sortedApps = [];
+
+        async function fetchAllFirebaseStats() {
+            try {
+                const snapshot = await db.collection('games').get();
+                snapshot.forEach(doc => { firebaseStats[doc.id] = doc.data(); });
+            } catch (error) {}
+        }
+
+        async function loadApps() {
+            await fetchAllFirebaseStats();
+
+            sortedApps = manualApps.map(app => {
+                const safeId = app.name.replace(/[^a-zA-Z0-9]/g, ''); 
+                const stats = firebaseStats[safeId] || { plays: 0, likes: 0, dislikes: 0 };
+                const score = (stats.likes * 10) + (stats.plays * 1) - (stats.dislikes * 5);
+                return { ...app, dbId: safeId, plays: stats.plays, likes: stats.likes, dislikes: stats.dislikes, score: score };
+            }).sort((a, b) => b.score - a.score);
+
+            updateCountAndRender(sortedApps);
+        }
+
+        window.incrementGameStat = async function(statType) {
+            if (!activeGameName) return;
+            const safeId = activeGameName.replace(/[^a-zA-Z0-9]/g, '');
+            const gameRef = db.collection('games').doc(safeId);
+
+            if(statType === 'likes') { document.getElementById('likesCount').innerText = parseInt(document.getElementById('likesCount').innerText) + 1; document.getElementById('likeBtn').disabled = true; document.getElementById('dislikeBtn').disabled = true; } 
+            else if (statType === 'dislikes') { document.getElementById('dislikesCount').innerText = parseInt(document.getElementById('dislikesCount').innerText) + 1; document.getElementById('likeBtn').disabled = true; document.getElementById('dislikeBtn').disabled = true; }
+
+            try {
+                const docSnap = await gameRef.get();
+                if (!docSnap.exists) await gameRef.set({ plays: statType === 'plays'?1:0, likes: statType === 'likes'?1:0, dislikes: statType === 'dislikes'?1:0, reports: 0 });
+                else await gameRef.update({ [statType]: firebase.firestore.FieldValue.increment(1) });
+            } catch (error) {}
+        }
+
+        function updateCountAndRender(appsToRender) {
+            document.getElementById('dataCount').textContent = `Showing ${appsToRender.length} applications`;
+            const zonesWrapper = document.getElementById('zonesWrapper');
+            zonesWrapper.innerHTML = '';
+            
+            if (appsToRender.length === 0) { zonesWrapper.innerHTML = '<p style="color:#888; font-size:1.2rem; text-align:center; width:100%;">No apps found.</p>'; return; }
+
+            const fragment = document.createDocumentFragment();
+            appsToRender.forEach(app => {
+                const item = document.createElement("div"); item.className = "zone-item";
+                item.innerHTML = `
+                    <img src="${app.cover}" loading="lazy" onerror="this.src='https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(app.name)}'">
+                    <div class="zone-name">${app.name}</div>
+                    <div class="hover-stats">
+                        <div class="stat-row"><i class="fa-solid fa-eye"></i> ${app.plays || 0}</div>
+                        <div class="stat-row"><i class="fa-solid fa-thumbs-up"></i> ${app.likes || 0}</div>
+                        <div class="stat-row"><i class="fa-solid fa-thumbs-down"></i> ${app.dislikes || 0}</div>
+                    </div>
+                `;
+                item.onclick = (e) => { e.preventDefault(); openZone(app); };
+                fragment.appendChild(item);
+            });
+            zonesWrapper.appendChild(fragment);
+        }
+
+        document.getElementById('dumbSearchInput').addEventListener('input', (e) => { 
+            const query = e.target.value.toLowerCase().trim();
+            if (query === '') { updateCountAndRender(sortedApps); return; }
+            const searchTokens = query.split(/\s+/);
+            const results = sortedApps.filter(z => searchTokens.every(token => `${z.name} ${z.author || ''}`.toLowerCase().includes(token)));
+            updateCountAndRender(results);
+        });
+
+        window.openZone = function(app) {
+            activeGameName = app.name;
+            const zoneFrame = document.getElementById('zoneFrame');
+            
+            zoneFrame.src = "about:blank";
+            document.getElementById('zoneName').textContent = app.name;
+            document.getElementById('pageGameTitle').textContent = app.name;
+            document.getElementById('zoneAuthor').textContent = app.author || "Web Application";
+            document.getElementById('toolbarIcon').src = app.cover;
+            
+            document.getElementById('playsCount').innerText = app.plays || 0;
+            document.getElementById('likesCount').innerText = app.likes || 0;
+            document.getElementById('dislikesCount').innerText = app.dislikes || 0;
+            document.getElementById('likeBtn').disabled = false;
+            document.getElementById('dislikeBtn').disabled = false;
+            
+            document.getElementById('appDesc').innerText = app.description || "No description provided.";
+            document.getElementById('pageTags').innerHTML = (app.tags || []).map(t => `<span class='tag'>${t}</span>`).join('');
+            document.getElementById('appNotes').innerHTML = (app.notes || []).map(n => `<li>${n}</li>`).join('') || "<li>No notes available.</li>";
+            
+            incrementGameStat('plays');
+            document.getElementById('zoneViewer').style.display = "block";
+
+            setTimeout(() => { zoneFrame.src = app.url; }, 100);
+        };
+
+        window.closeZone = function() { document.getElementById('zoneViewer').style.display = "none"; document.getElementById('zoneFrame').src = "about:blank"; activeGameName = null; };
+        window.reloadFrame = function() { const f = document.getElementById('zoneFrame'); const c = f.src; f.src = "about:blank"; setTimeout(() => { f.src = c; }, 50); };
+        window.fullscreenZone = function() { const f = document.getElementById('zoneFrame'); if (f.requestFullscreen) f.requestFullscreen(); else if (f.webkitRequestFullscreen) f.webkitRequestFullscreen(); };
+        window.openSiteInAboutBlank = function() { let w = window.open('about:blank', '_blank'); w.document.body.style.margin = '0'; w.document.body.style.height = '100vh'; w.document.body.style.overflow = 'hidden'; let i = w.document.createElement('iframe'); i.style.border = 'none'; i.style.width = '100%'; i.style.height = '100%'; i.src = window.location.href; w.document.body.appendChild(i); window.location.replace('https://classroom.google.com'); };
+        window.openGameInAboutBlank = function() { const f = document.getElementById('zoneFrame'); if (!f.src || f.src === 'about:blank') return; let w = window.open('about:blank', '_blank'); w.document.body.style.margin = '0'; w.document.body.style.height = '100vh'; w.document.body.style.overflow = 'hidden'; let i = w.document.createElement('iframe'); i.style.border = 'none'; i.style.width = '100%'; i.style.height = '100%'; i.src = f.src; w.document.body.appendChild(i); closeZone(); };
+
+        loadApps();
+
+        const ship = document.getElementById('custom-v-cursor');
+        const iframeBox = document.getElementById('iframeBox');
+        let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+        let shipX = window.innerWidth / 2, shipY = window.innerHeight / 2;
+        let currentAngle = 0, isCursorVisible = false;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX; mouseY = e.clientY;
+            const overIframe = e.target.closest('#iframeBox') || e.target.tagName.toLowerCase() === 'iframe';
+            if (overIframe) { if (isCursorVisible) { ship.style.opacity = '0'; isCursorVisible = false; } } 
+            else { if (!isCursorVisible) { ship.style.opacity = '1'; isCursorVisible = true; } }
+        });
+
+        if (iframeBox) {
+            iframeBox.addEventListener('mouseenter', () => { ship.style.opacity = '0'; isCursorVisible = false; });
+            iframeBox.addEventListener('mouseleave', () => { ship.style.opacity = '1'; isCursorVisible = true; });
+        }
+
+        document.addEventListener('mouseout', (e) => { if (e.relatedTarget === null) { ship.style.opacity = '0'; isCursorVisible = false; }});
+        window.addEventListener('blur', () => { ship.style.opacity = '0'; isCursorVisible = false; });
+        document.addEventListener('visibilitychange', () => { if (document.hidden) { ship.style.opacity = '0'; isCursorVisible = false; }});
+
+        function animateCursor() {
+            const dx = mouseX - shipX; const dy = mouseY - shipY;
+            shipX += dx * 0.45; shipY += dy * 0.45;
+            if (Math.abs(dx) > 1 || Math.abs(dy) > 1) { currentAngle = Math.atan2(dy, dx) * (180 / Math.PI) + 90; }
+            ship.style.transform = `translate3d(${shipX - 16}px, ${shipY - 16}px, 0) rotate(${currentAngle}deg)`;
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+    </script>
+</body>
+</html>

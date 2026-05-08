@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kraken Network</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0; padding: 0;
+            width: 100vw; height: 100vh;
+            background-color: #050a14;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            cursor: none;
+        }
+
+        .bg-glow {
+            position: absolute;
+            width: 600px; height: 600px;
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.15;
+            pointer-events: none;
+        }
+        .bg-glow-1 { top: -200px; left: 50%; transform: translateX(-50%); background: #3b82f6; }
+        .bg-glow-2 { bottom: -300px; right: -100px; background: #1d4ed8; width: 400px; height: 400px; }
+
+        .title-container {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -55%);
+            z-index: 10;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .logo {
+            width: 120px; height: 120px;
+            border-radius: 24px;
+            margin: 0 auto 24px;
+            box-shadow: 0 0 60px rgba(59, 130, 246, 0.4), 0 0 120px rgba(59, 130, 246, 0.15);
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 40%, #93c5fd 70%, #2563eb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: titleGlow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes titleGlow {
+            0% { filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3)); }
+            100% { filter: drop-shadow(0 0 40px rgba(59, 130, 246, 0.6)); }
+        }
+
+        .subtitle {
+            color: #6b7fa3;
+            font-size: 1rem;
+            letter-spacing: 0.3em;
+            margin-top: 8px;
+            text-transform: uppercase;
+            font-weight: 400;
+        }
+
+        .footer-links {
+            position: fixed;
+            bottom: 24px; left: 50%;
+            transform: translateX(-50%);
+            display: flex; gap: 24px;
+            z-index: 10;
+        }
+
+        .footer-links a {
+            color: #4a6a96;
+            text-decoration: none;
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: #60a5fa; }
+    </style>
+</head>
+<body>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="title-container">
+        <img src="assets/img/logo.jpg" alt="Kraken Network" class="logo">
+        <h1>Kraken Network</h1>
+        <div class="subtitle">Dive into the depths</div>
+    </div>
+
+    <div class="footer-links">
+        <a href="#" target="_blank">GitHub</a>
+        <a href="#" target="_blank">Discord</a>
+    </div>
+
+<script src="/pilly.js"></script>
+</body>
+</html>
