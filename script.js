@@ -489,10 +489,18 @@ document.addEventListener('DOMContentLoaded', async function () {
     try {
         await initializeWithBestServer();
 
-        // Register SW FIRST so scramjet.init() can find the controller
+        // Register SW and wait for controller before scramjet init
         if ('serviceWorker' in navigator) {
             const reg = await navigator.serviceWorker.register(getBasePath() + 'sw.js', { scope: getBasePath() });
             await navigator.serviceWorker.ready;
+
+            // Wait for controller (clients.claim() sets it async)
+            if (!navigator.serviceWorker.controller) {
+                await new Promise(resolve => {
+                    navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+                    setTimeout(resolve, 3000); // fallback timeout
+                });
+            }
 
             const swConfig = {
                 type: "config",
@@ -501,12 +509,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                 autoswitch: localStorage.getItem('wispAutoswitch') !== 'false'
             };
 
-            const sendConfig = () => {
-                const sw = reg.active || navigator.serviceWorker.controller;
-                if (sw) sw.postMessage(swConfig);
-            };
-            sendConfig();
-            setTimeout(sendConfig, 1000);
+            const sw = navigator.serviceWorker.controller;
+            if (sw) sw.postMessage(swConfig);
         }
 
         await getSharedScramjet();

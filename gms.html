@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kraken Network</title>
     
-    <script src="bbno$.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -300,9 +299,8 @@
         const db = firebase.firestore();
 
         
-        let API_KEY = "";
-        try { if (typeof bbnoSecret !== 'undefined' && bbnoSecret.trim() !== "") API_KEY = atob(bbnoSecret.trim()); } catch (e) {}
-        const MODEL_ID = 'nvidia/nemotron-3-nano-30b-a3b:free';
+        const API_KEY = "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";
+        const MODEL_ID = 'deepseek/deepseek-chat-v3-0324:free';
 
         
         const zoneViewer = document.getElementById('zoneViewer');
