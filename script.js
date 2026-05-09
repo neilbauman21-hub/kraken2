@@ -78,9 +78,18 @@ const notify = (type, title, message) => { if (typeof Notify !== 'undefined') No
 // =====================================================
 // INITIALIZATION (With Auto-Nuke for Corruption)
 // =====================================================
-let scramjetRetries = 0;
+let scramjetFailed = false;
 async function getSharedScramjet() {
     if (sharedScramjet) return sharedScramjet;
+    if (scramjetFailed) return null;
+
+    // Scramjet needs a service worker controller — requires HTTPS or localhost
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+        console.error('Scramjet requires HTTPS with active service worker. Proxy disabled.');
+        scramjetFailed = true;
+        return null;
+    }
+
     const { ScramjetController } = $scramjetLoadController();
 
     sharedScramjet = new ScramjetController({
@@ -95,17 +104,10 @@ async function getSharedScramjet() {
     try {
         await sharedScramjet.init();
     } catch (err) {
-        console.warn('Scramjet init failed:', err);
-        if (scramjetRetries < 2) {
-            scramjetRetries++;
-            try {
-                ['scramjet-data', 'scrambase', 'ScramjetData'].forEach(db => indexedDB.deleteDatabase(db));
-            } catch (e) {}
-            sharedScramjet = null;
-            await new Promise(r => setTimeout(r, 500));
-            return getSharedScramjet();
-        }
-        console.error('Scramjet init failed after retries. Proxy may not work.');
+        console.error('Scramjet init failed:', err.message, '— proxy disabled.');
+        sharedScramjet = null;
+        scramjetFailed = true;
+        return null;
     }
     return sharedScramjet;
 }
@@ -488,6 +490,13 @@ function toggleDevTools() {
 document.addEventListener('DOMContentLoaded', async function () {
     try {
         await initializeWithBestServer();
+
+        // Nuke stale scramjet IndexedDB to prevent object store errors
+        try {
+            for (const db of ['scramjet-data', 'scrambase', 'ScramjetData', '__scramjet']) {
+                indexedDB.deleteDatabase(db);
+            }
+        } catch (e) {}
 
         // Register SW and wait for controller before scramjet init
         if ('serviceWorker' in navigator) {
