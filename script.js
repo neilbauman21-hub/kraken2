@@ -489,7 +489,7 @@ function toggleDevTools() {
 // =====================================================
 document.addEventListener('DOMContentLoaded', async function () {
     try {
-        await initializeWithBestServer();
+        // await initializeWithBestServer(); // Handled by SW now
 
         // Nuke stale scramjet IndexedDB to prevent object store errors
         try {

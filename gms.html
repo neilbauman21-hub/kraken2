@@ -7,8 +7,8 @@
     <title>Kraken Network</title>
     
 
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js" defer></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -413,7 +413,7 @@
                 const item = document.createElement("div"); item.className = "zone-item";
                 item.innerHTML = `
                     <div class="source-tag">${file.sourceName}</div>
-                    <img src="${file.resolvedCover}" loading="lazy" onerror="this.src='https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(file.name)}'">
+                    <img src="${file.resolvedCover}" loading="lazy" onerror="this.src='assets/img/placeholder.png'">
                     <div class="zone-name">${file.name}</div>
                     <div class="hover-stats">
                         <div class="stat-row"><i class="fa-solid fa-eye"></i> ${file.plays || 0}</div>
@@ -441,7 +441,7 @@
             const grid = document.getElementById('sidebarGrid'); grid.innerHTML = '';
             let selected = allZones.slice(0, 6);
             selected.forEach(file => {
-                const imgUrl = file.resolvedCover || `https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(file.name)}`;
+                const imgUrl = file.resolvedCover || `assets/img/placeholder.png`;
                 const item = document.createElement('div'); item.className = 'suggested-item';
                 item.innerHTML = `<img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(file.name)}'" title="${file.name}">`;
                 item.onclick = () => { openZone(file); }; grid.appendChild(item);

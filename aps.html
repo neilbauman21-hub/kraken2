@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kraken Apps</title>
     
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://unpkg.com/lucide@latest" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js" defer></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -273,7 +273,7 @@
             appsToRender.forEach(app => {
                 const item = document.createElement("div"); item.className = "zone-item";
                 item.innerHTML = `
-                    <img src="${app.cover}" loading="lazy" onerror="this.src='https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(app.name)}'">
+                    <img src="${app.cover}" loading="lazy" onerror="this.src='assets/img/placeholder.png'">
                     <div class="zone-name">${app.name}</div>
                     <div class="hover-stats">
                         <div class="stat-row"><i class="fa-solid fa-eye"></i> ${app.plays || 0}</div>

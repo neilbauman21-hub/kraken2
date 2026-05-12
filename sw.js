@@ -52,14 +52,18 @@ const ADBLOCK = {
 ]   
 };
 
+// Pre-compile regex patterns once
+const compiledAdBlockRegexes = ADBLOCK.blocked.map(pattern => {
+    let regexPattern = pattern
+        .replace(/\*/g, '.*')
+        .replace(/\./g, '\\.')
+        .replace(/\?/g, '\\?');
+    return new RegExp('^' + regexPattern + '$', 'i');
+});
+
 function isAdBlocked(url) {
     const urlStr = url.toString();
-    for (const pattern of ADBLOCK.blocked) {
-        let regexPattern = pattern
-            .replace(/\*/g, '.*')
-            .replace(/\./g, '\\.')
-            .replace(/\?/g, '\\?');
-        const regex = new RegExp('^' + regexPattern + '$', 'i');
+    for (const regex of compiledAdBlockRegexes) {
         if (regex.test(urlStr)) {
             return true;
         }
