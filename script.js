@@ -115,12 +115,16 @@ async function getSharedScramjet() {
 async function getSharedConnection() {
     if (sharedConnectionReady) return sharedConnection;
     const wispUrl = localStorage.getItem("proxServer") ?? DEFAULT_WISP;
-    sharedConnection = new BareMux.BareMuxConnection(getBasePath() + "bareworker.js");
     
-    await sharedConnection.setTransport(
-        "https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@latest/dist/index.mjs",
-        [{ wisp: wispUrl }]
-    );
+    // Create a new Worker instance for bareworker.js
+    const bareWorker = new Worker(getBasePath() + "bareworker.js");
+
+    // Pass the worker to BareMux.BareMuxConnection
+    sharedConnection = new BareMux.BareMuxConnection(bareWorker);
+    
+    // Send the WISP URL to the bareworker.js
+    bareWorker.postMessage({ type: 'SET_WISP_URL', wispUrl: wispUrl });
+
     sharedConnectionReady = true;
     return sharedConnection;
 }
@@ -491,15 +495,26 @@ function toggleDevTools() {
 // =====================================================
 document.addEventListener('DOMContentLoaded', async function () {
     try {
-        // Nuke stale scramjet IndexedDB to prevent object store errors
+        // Aggressive IndexedDB Cleanup: Delete all databases for the origin
         try {
-            for (const db of ['scramjet-data', 'scrambase', 'ScramjetData', '__scramjet']) {
-                indexedDB.deleteDatabase(db);
+            const dbNames = await indexedDB.databases();
+            for (const dbInfo of dbNames) {
+                if (dbInfo.name.startsWith('scramjet') || dbInfo.name.startsWith('BareMux') || dbInfo.name.startsWith('ScramjetData') || dbInfo.name.startsWith('__bare')) {
+                    console.warn(`Attempting to delete IndexedDB: ${dbInfo.name}`);
+                    await new Promise((resolve, reject) => {
+                        const req = indexedDB.deleteDatabase(dbInfo.name);
+                        req.onsuccess = () => resolve();
+                        req.onerror = (event) => reject(event.target.error);
+                        req.onblocked = () => console.warn(`Deletion of ${dbInfo.name} blocked. Close all tabs for this site.`);
+                    });
+                }
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error("Error during aggressive IndexedDB cleanup:", e);
+        }
 
         // Centralized robust service worker initialization
-        await (async function waitForServiceWorker() {
+        await (async function waitForServiceWorkerAndConfigure() {
             if (!('serviceWorker' in navigator)) {
                 console.error("Service Workers are not supported in this browser.");
                 return;
@@ -508,52 +523,29 @@ document.addEventListener('DOMContentLoaded', async function () {
             const basePath = getBasePath();
             const swUrl = basePath + 'sw.js';
 
-            console.log("Registering service worker...");
-            const registration = await navigator.serviceWorker.register(swUrl, { scope: basePath });
-            console.log("Service worker registered:", registration);
+            // Register the service worker
+            let registration = await navigator.serviceWorker.register(swUrl, { scope: basePath });
+            console.log("Service worker registration complete:", registration);
 
-            // Wait for the service worker to become active
-            if (registration.installing) {
-                console.log("Service worker installing...");
-                await new Promise(resolve => {
-                    registration.installing.addEventListener('statechange', function handler() {
-                        if (this.state === 'activated') {
-                            console.log("Service worker activated.");
-                            registration.installing.removeEventListener('statechange', handler);
-                            resolve();
-                        }
-                    });
-                });
-            } else if (registration.waiting) {
-                console.log("Service worker waiting. Skipping straight to activate.");
-                // If there's a waiting service worker, try to activate it directly
-                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                await new Promise(resolve => {
-                    navigator.serviceWorker.addEventListener('controllerchange', function handler() {
-                        console.log("Service worker controller changed (from waiting).");
-                        navigator.serviceWorker.removeEventListener('controllerchange', handler);
-                        resolve();
-                    }, { once: true });
-                });
-            } else if (registration.active) {
-                console.log("Service worker already active.");
-            }
-
-            // Ensure the page is controlled by the active service worker
+            // Ensure we have an active service worker and it's controlling the page
             if (!navigator.serviceWorker.controller) {
                 console.log("Waiting for service worker to control the page...");
                 await new Promise(resolve => {
-                    navigator.serviceWorker.addEventListener('controllerchange', function handler() {
+                    navigator.serviceWorker.addEventListener('controllerchange', () => {
                         console.log("Service worker is now controlling the page.");
-                        navigator.serviceWorker.removeEventListener('controllerchange', handler);
                         resolve();
                     }, { once: true });
-                    // If the page is already being controlled by an active SW, resolve immediately
-                    if (navigator.serviceWorker.controller) {
-                        resolve();
+                    // If a waiting worker exists, prompt it to activate immediately
+                    if (registration.waiting) {
+                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
                     }
                 });
+            } else {
+                console.log("Service worker already controlling the page.");
             }
+            
+            // Wait until the active service worker is ready (has finished its internal initialization)
+            await navigator.serviceWorker.ready;
 
             // Send initial config to the active service worker
             const swConfig = {
