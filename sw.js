@@ -242,16 +242,110 @@ self.addEventListener("message", ({ data }) => {
     }
 });
 
+// Scramjet internal assets loaded from cdn.jsdelivr.net - MUST NOT be proxied
+const SCRAMJET_INTERNAL_ASSETS = [
+    "https://cdn.jsdelivr.net/gh/Destroyed12121/Staticsj@main/JS/scramjet.wasm.wasm",
+    "https://cdn.jsdelivr.net/gh/Destroyed12121/Staticsj@main/JS/scramjet.all.js",
+    "https://cdn.jsdelivr.net/gh/Destroyed12121/Staticsj@main/JS/scramjet.sync.js",
+    // Also include BareMux itself as it's a dependency
+    "https://cdn.jsdelivr.net/npm/@mercuryworkshop/bare-mux/dist/index.js"
+];
+
+let bareMuxInstance = null; // Centralized BareMuxConnection instance
+
+async function initBareMuxConnection(wispUrl) {
+    if (bareMuxInstance && bareMuxInstance.wispUrl === wispUrl) {
+        // Already initialized with the same WISP URL
+        return bareMuxInstance;
+    }
+
+    console.log(`SW: Initializing BareMuxConnection with WISP: ${wispUrl}`);
+    const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
+    connection.wispUrl = wispUrl; // Store wispUrl for easy comparison
+
+    try {
+        await connection.setTransport(
+            "https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@latest/dist/index.mjs",
+            [{ wisp: wispUrl }]
+        );
+        bareMuxInstance = connection;
+        console.log("SW: BareMuxConnection initialized successfully.");
+        return bareMuxInstance;
+    } catch (error) {
+        console.error("SW: Failed to initialize BareMuxConnection:", error);
+        bareMuxInstance = null; // Reset on failure
+        throw error;
+    }
+}
+
+self.addEventListener("message", ({ data }) => {
+    if (data.type === "config") {
+        if (data.wispurl && wispConfig.wispurl !== data.wispurl) {
+            wispConfig.wispurl = data.wispurl;
+            console.log("SW: Received new wispurl:", data.wispurl);
+            currentServerStartTime = Date.now();
+            // Re-initialize BareMuxConnection if WISP URL changes
+            initBareMuxConnection(wispConfig.wispurl).catch(e => console.error("SW: Error re-initializing BareMux connection:", e));
+        }
+        if (data.servers && data.servers.length > 0) {
+            wispConfig.servers = data.servers;
+            console.log("SW: Received servers:", data.servers.length);
+            if (wispConfig.autoswitch) {
+                setTimeout(proactiveServerCheck, 500);
+            }
+        }
+        if (typeof data.autoswitch !== 'undefined') {
+            wispConfig.autoswitch = data.autoswitch;
+            if (wispConfig.autoswitch && wispConfig.servers?.length > 0) {
+                setTimeout(proactiveServerCheck, 500);
+            }
+        }
+        // Resolve config ready when we have at least wispurl
+        if (wispConfig.wispurl && resolveConfigReady) {
+            resolveConfigReady();
+            resolveConfigReady = null;
+        }
+    } else if (data.type === "ping") {
+        pingServer(wispConfig.wispurl).then(result => {
+            self.clients.matchAll().then(clients => {
+                clients.forEach(client => {
+                    client.postMessage({ type: 'pingResult', ...result });
+                });
+            });
+        });
+    } else if (data.type === 'SKIP_WAITING') {
+        self.skipWaiting(); // For activating waiting service worker immediately
+    }
+});
+
 self.addEventListener("fetch", (event) => {
     event.respondWith((async () => {
+        const requestUrl = event.request.url;
+
+        // Bypass proxying for Scramjet's own internal assets
+        if (SCRAMJET_INTERNAL_ASSETS.some(assetUrl => requestUrl.startsWith(assetUrl))) {
+            console.log("SW: Bypassing proxy for internal Scramjet asset:", requestUrl);
+            return fetch(event.request);
+        }
+
         // Check if request URL matches ad blocking patterns
-        if (isAdBlocked(event.request.url)) {
-            console.log("SW: Blocked ad request:", event.request.url);
+        if (isAdBlocked(requestUrl)) {
+            console.log("SW: Blocked ad request:", requestUrl);
             return new Response(new ArrayBuffer(0), { status: 204 });
         }
 
-        await scramjet.loadConfig();
+        await scramjet.loadConfig(); // Ensure Scramjet config is loaded
+
+        // Only try to proxy if Scramjet determines it's a proxied request AND bareMuxInstance is ready
         if (scramjet.route(event)) {
+            if (!bareMuxInstance) {
+                // Try to initialize BareMuxConnection if not already
+                await initBareMuxConnection(wispConfig.wispurl || DEFAULT_WISP);
+                if (!bareMuxInstance) {
+                    console.error("SW: BareMuxConnection not available for proxied request:", requestUrl);
+                    return new Response("Proxy not initialized", { status: 502 });
+                }
+            }
             return scramjet.fetch(event);
         }
         return fetch(event.request);
@@ -266,10 +360,14 @@ scramjet.addEventListener("request", async (e) => {
             return new Response("Wisp URL not configured", { status: 500 });
         }
 
-        if (!scramjet.client) {
-            const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
-            await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@2.1.28/dist/index.mjs", [{ wisp: wispConfig.wispurl }]);
-            scramjet.client = connection;
+        // Use the globally managed bareMuxInstance
+        if (!bareMuxInstance) {
+             console.error("SW: bareMuxInstance is null in scramjet.addEventListener 'request'. Re-initializing.");
+             await initBareMuxConnection(wispConfig.wispurl || DEFAULT_WISP);
+             if (!bareMuxInstance) {
+                console.error("SW: Failed to initialize bareMuxInstance after retry.");
+                return new Response("Proxy not initialized for scramjet request", { status: 502 });
+             }
         }
 
         const MAX_RETRIES = 2;
@@ -277,7 +375,7 @@ scramjet.addEventListener("request", async (e) => {
 
         for (let i = 0; i <= MAX_RETRIES; i++) {
             try {
-                return await scramjet.client.fetch(e.url, {
+                return await bareMuxInstance.fetch(e.url, { // Use bareMuxInstance.fetch
                     method: e.method,
                     body: e.body,
                     headers: e.requestHeaders,

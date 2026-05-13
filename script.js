@@ -84,36 +84,10 @@ async function getSharedScramjet() {
     if (scramjetFailed) return null;
 
     // Scramjet needs a service worker controller — requires HTTPS or localhost
-    if (!navigator.serviceWorker) {
-        console.error('Service workers not supported. Proxy disabled.');
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+        console.error('Scramjet requires HTTPS with active service worker. Proxy disabled.');
         scramjetFailed = true;
         return null;
-    }
-
-    // Explicitly wait for the service worker to be active and controlling the page
-    if (!navigator.serviceWorker.controller) {
-        console.log("Waiting for service worker controller to become active...");
-        await new Promise(resolve => {
-            const checkController = () => {
-                if (navigator.serviceWorker.controller) {
-                    console.log("Service worker controller is now active.");
-                    resolve();
-                } else {
-                    setTimeout(checkController, 100); // Check again after a short delay
-                }
-            };
-            // Also listen for controllerchange as it might be triggered later
-            navigator.serviceWorker.addEventListener('controllerchange', checkController, { once: true });
-            checkController(); // Initial check
-            
-            // Fallback timeout to reload if SW doesn't take control
-            setTimeout(() => {
-                if (!navigator.serviceWorker.controller) {
-                    console.warn("Service worker controller not active after timeout. Reloading page to force activation.");
-                    window.location.reload();
-                }
-            }, 7000); // 7-second fallback timeout
-        });
     }
 
     const { ScramjetController } = $scramjetLoadController();
@@ -144,7 +118,7 @@ async function getSharedConnection() {
     sharedConnection = new BareMux.BareMuxConnection(getBasePath() + "bareworker.js");
     
     await sharedConnection.setTransport(
-        "https://cdn.jsdelivr.net/gh/Sea-Math/sail@main/libcurl/index.mjs",
+        "https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@latest/dist/index.mjs",
         [{ wisp: wispUrl }]
     );
     sharedConnectionReady = true;
@@ -152,6 +126,15 @@ async function getSharedConnection() {
 }
 
 // Check if SW is alive before navigating
+async function ensureServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) {
+            console.warn("Service Worker asleep! Reloading window to wake it up...");
+            window.location.reload();
+        }
+    }
+}
 
 
 async function initializeBrowser() {
@@ -377,6 +360,7 @@ function updateAddressBar() {
 }
 
 async function handleSubmit(url) {
+    await ensureServiceWorker(); // Check SW before sending request
 
     const tab = getActiveTab();
     let input = url ?? document.getElementById("address-bar").value.trim();
@@ -507,8 +491,6 @@ function toggleDevTools() {
 // =====================================================
 document.addEventListener('DOMContentLoaded', async function () {
     try {
-        // await initializeWithBestServer(); // Handled by SW now
-
         // Nuke stale scramjet IndexedDB to prevent object store errors
         try {
             for (const db of ['scramjet-data', 'scrambase', 'ScramjetData', '__scramjet']) {
@@ -516,30 +498,74 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         } catch (e) {}
 
-        // Register SW and wait for controller before scramjet init
-        if ('serviceWorker' in navigator) {
-            const reg = await navigator.serviceWorker.register(getBasePath() + 'sw.js', { scope: getBasePath() });
-            await navigator.serviceWorker.ready;
+        // Centralized robust service worker initialization
+        await (async function waitForServiceWorker() {
+            if (!('serviceWorker' in navigator)) {
+                console.error("Service Workers are not supported in this browser.");
+                return;
+            }
 
-            // Wait for controller (clients.claim() sets it async)
-            if (!navigator.serviceWorker.controller) {
+            const basePath = getBasePath();
+            const swUrl = basePath + 'sw.js';
+
+            console.log("Registering service worker...");
+            const registration = await navigator.serviceWorker.register(swUrl, { scope: basePath });
+            console.log("Service worker registered:", registration);
+
+            // Wait for the service worker to become active
+            if (registration.installing) {
+                console.log("Service worker installing...");
                 await new Promise(resolve => {
-                    navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
-                    setTimeout(resolve, 3000); // fallback timeout
+                    registration.installing.addEventListener('statechange', function handler() {
+                        if (this.state === 'activated') {
+                            console.log("Service worker activated.");
+                            registration.installing.removeEventListener('statechange', handler);
+                            resolve();
+                        }
+                    });
+                });
+            } else if (registration.waiting) {
+                console.log("Service worker waiting. Skipping straight to activate.");
+                // If there's a waiting service worker, try to activate it directly
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                await new Promise(resolve => {
+                    navigator.serviceWorker.addEventListener('controllerchange', function handler() {
+                        console.log("Service worker controller changed (from waiting).");
+                        navigator.serviceWorker.removeEventListener('controllerchange', handler);
+                        resolve();
+                    }, { once: true });
+                });
+            } else if (registration.active) {
+                console.log("Service worker already active.");
+            }
+
+            // Ensure the page is controlled by the active service worker
+            if (!navigator.serviceWorker.controller) {
+                console.log("Waiting for service worker to control the page...");
+                await new Promise(resolve => {
+                    navigator.serviceWorker.addEventListener('controllerchange', function handler() {
+                        console.log("Service worker is now controlling the page.");
+                        navigator.serviceWorker.removeEventListener('controllerchange', handler);
+                        resolve();
+                    }, { once: true });
+                    // If the page is already being controlled by an active SW, resolve immediately
+                    if (navigator.serviceWorker.controller) {
+                        resolve();
+                    }
                 });
             }
 
+            // Send initial config to the active service worker
             const swConfig = {
                 type: "config",
                 wispurl: localStorage.getItem("proxServer") ?? DEFAULT_WISP,
                 servers: getAllWispServers(),
                 autoswitch: localStorage.getItem('wispAutoswitch') !== 'false'
             };
-
-            const sw = navigator.serviceWorker.controller;
-            if (sw) sw.postMessage(swConfig);
-        }
-
+            navigator.serviceWorker.controller?.postMessage(swConfig);
+            console.log("Service Worker ready and configured.");
+        })();
+        
         await getSharedScramjet();
         await getSharedConnection();
         await initializeBrowser();
