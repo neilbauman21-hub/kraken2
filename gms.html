@@ -443,7 +443,7 @@
             selected.forEach(file => {
                 const imgUrl = file.resolvedCover || `assets/img/placeholder.png`;
                 const item = document.createElement('div'); item.className = 'suggested-item';
-                item.innerHTML = `<img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/200x200/0c1524/60a5fa?text=${encodeURIComponent(file.name)}'" title="${file.name}">`;
+                item.innerHTML = `<img src="${imgUrl}" onerror="this.src='assets/img/placeholder.png'" title="${file.name}">`;
                 item.onclick = () => { openZone(file); }; grid.appendChild(item);
             });
         }

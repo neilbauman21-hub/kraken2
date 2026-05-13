@@ -84,10 +84,36 @@ async function getSharedScramjet() {
     if (scramjetFailed) return null;
 
     // Scramjet needs a service worker controller — requires HTTPS or localhost
-    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
-        console.error('Scramjet requires HTTPS with active service worker. Proxy disabled.');
+    if (!navigator.serviceWorker) {
+        console.error('Service workers not supported. Proxy disabled.');
         scramjetFailed = true;
         return null;
+    }
+
+    // Explicitly wait for the service worker to be active and controlling the page
+    if (!navigator.serviceWorker.controller) {
+        console.log("Waiting for service worker controller to become active...");
+        await new Promise(resolve => {
+            const checkController = () => {
+                if (navigator.serviceWorker.controller) {
+                    console.log("Service worker controller is now active.");
+                    resolve();
+                } else {
+                    setTimeout(checkController, 100); // Check again after a short delay
+                }
+            };
+            // Also listen for controllerchange as it might be triggered later
+            navigator.serviceWorker.addEventListener('controllerchange', checkController, { once: true });
+            checkController(); // Initial check
+            
+            // Fallback timeout to reload if SW doesn't take control
+            setTimeout(() => {
+                if (!navigator.serviceWorker.controller) {
+                    console.warn("Service worker controller not active after timeout. Reloading page to force activation.");
+                    window.location.reload();
+                }
+            }, 7000); // 7-second fallback timeout
+        });
     }
 
     const { ScramjetController } = $scramjetLoadController();
@@ -126,15 +152,7 @@ async function getSharedConnection() {
 }
 
 // Check if SW is alive before navigating
-async function ensureServiceWorker() {
-    if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.ready;
-        if (!navigator.serviceWorker.controller) {
-            console.warn("Service Worker asleep! Reloading window to wake it up...");
-            window.location.reload();
-        }
-    }
-}
+
 
 async function initializeBrowser() {
     const root = document.getElementById("app");
@@ -359,7 +377,7 @@ function updateAddressBar() {
 }
 
 async function handleSubmit(url) {
-    await ensureServiceWorker(); // Check SW before sending request
+
     const tab = getActiveTab();
     let input = url ?? document.getElementById("address-bar").value.trim();
     if (!input) return;
