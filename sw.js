@@ -83,14 +83,39 @@ self.$scramjet = {
 };
 
 importScripts("https://cdn.jsdelivr.net/gh/Destroyed12121/Staticsj@main/JS/scramjet.all.js");
-importScripts("https://cdn.jsdelivr.net/npm/@mercuryworkshop/bare-mux/dist/index.js");
+importScripts("https://cdn.jsdelivr.net/npm/@mercuryworkshop/bare-mux@latest/dist/index.js");
 
 const { ScramjetServiceWorker } = $scramjetLoadWorker();
 const scramjet = new ScramjetServiceWorker({
     prefix: basePath + "scramjet/"
 });
 
-self.addEventListener('install', (e) => self.skipWaiting());
+self.addEventListener('install', async (e) => {
+    e.waitUntil((async () => {
+        self.skipWaiting();
+        // Aggressive IndexedDB Cleanup: Delete all databases for the origin
+        try {
+            const dbNames = await indexedDB.databases();
+            for (const dbInfo of dbNames) {
+                // Target databases related to Scramjet or BareMux
+                if (dbInfo.name.startsWith('scramjet') || dbInfo.name.startsWith('BareMux') || dbInfo.name.startsWith('ScramjetData') || dbInfo.name.startsWith('__bare')) {
+                    console.warn(`SW Install: Attempting to delete IndexedDB: ${dbInfo.name}`);
+                    await new Promise((resolve, reject) => {
+                        const req = indexedDB.deleteDatabase(dbInfo.name);
+                        req.onsuccess = () => resolve();
+                        req.onerror = (event) => {
+                            console.error(`SW Install: Failed to delete IndexedDB ${dbInfo.name}:`, event.target.error);
+                            reject(event.target.error);
+                        };
+                    });
+                }
+            }
+            console.log("SW Install: Aggressive IndexedDB cleanup completed.");
+        } catch (e) {
+            console.error("SW Install: Error during aggressive IndexedDB cleanup:", e);
+        }
+    })());
+});
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
 // Wisp configuration - receives from script.js via postMessage

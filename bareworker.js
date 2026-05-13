@@ -1,4 +1,24 @@
-importScripts("https://cdn.jsdelivr.net/npm/@mercuryworkshop/bare-mux/dist/index.js");
+// Aggressive IndexedDB Cleanup for dedicated worker
+(async function cleanupIndexedDB() {
+    try {
+        const dbNames = await indexedDB.databases();
+        for (const dbInfo of dbNames) {
+            if (dbInfo.name.startsWith('scramjet') || dbInfo.name.startsWith('BareMux') || dbInfo.name.startsWith('ScramjetData') || dbInfo.name.startsWith('__bare')) {
+                console.warn(`bareworker.js: Attempting to delete IndexedDB: ${dbInfo.name}`);
+                await new Promise((resolve, reject) => {
+                    const req = indexedDB.deleteDatabase(dbInfo.name);
+                    req.onsuccess = () => resolve();
+                    req.onerror = (event) => reject(event.target.error);
+                });
+            }
+        }
+        console.log("bareworker.js: Aggressive IndexedDB cleanup completed.");
+    } catch (e) {
+        console.error("bareworker.js: Error during aggressive IndexedDB cleanup:", e);
+    }
+})();
+
+importScripts("https://cdn.jsdelivr.net/npm/@mercuryworkshop/bare-mux@latest/dist/index.js");
 
 const bareMux = new BareMux.BareMuxClient();
 let wispUrl = null; // Store wispUrl received from main thread
